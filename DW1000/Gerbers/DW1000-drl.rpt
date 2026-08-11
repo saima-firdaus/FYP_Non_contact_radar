@@ -1,0 +1,25 @@
+Drill report for DW1000.kicad_pcb
+Created on 2026-08-11T20:56:17
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  In1.Cu                    in1
+    L3 :  In2.Cu                    in2
+    L4 :  B.Cu                      back
+
+
+Drill file 'DW1000-PTH-drl.gbr' contains
+    plated through holes:
+    =============================================================
+    T1  0.300mm  0.0118"  (66 holes))
+    T2  0.890mm  0.0350"  (15 holes))
+
+    Total plated holes count 81
+
+
+Drill file 'DW1000-NPTH-drl.gbr' contains
+    unplated through holes:
+    =============================================================
+
+    Total unplated holes count 0
