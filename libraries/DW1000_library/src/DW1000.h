@@ -38,6 +38,11 @@
 #include "DW1000Time.h"
 struct CIRSample {
 	/**
+	Default Constructor for CIRSample
+	*/
+	CIRSample() : real(0), imag(0) {}
+	
+	/**
 	Constructor for CIRSample
 
 	@param real The real part of the sample

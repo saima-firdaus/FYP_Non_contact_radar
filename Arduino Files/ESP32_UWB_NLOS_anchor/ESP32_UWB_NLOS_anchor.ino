@@ -23,9 +23,9 @@
 // ---- Pin definitions for Makerfabs DWM1000 ----
 // Adjust these to match your wiring.
 // Common Makerfabs wiring (verify against your schematic):
-const uint8_t PIN_RST  = 9;    // RESET
-const uint8_t PIN_IRQ  = 2;    // IRQ / interrupt
-const uint8_t PIN_SS   = SS;   // SPI chip select (usually 10 on Uno, or as defined)
+const uint8_t PIN_RST = 27;   // was 9
+const uint8_t PIN_IRQ = 34;   // was 2
+const uint8_t PIN_SS  = 4;    // was SS (default macro)
 
 // ---- CIR configuration ----
 // How many samples to read per frame.
@@ -66,10 +66,14 @@ void setup() {
 
     // Initialise DW1000
     DW1000.begin(PIN_IRQ, PIN_RST);
+    Serial.println(F("#1"));
     DW1000.select(PIN_SS);
+    Serial.println(F("#2"));
 
     DW1000.newConfiguration();
+    Serial.println(F("#3"));
     DW1000.setDefaults();
+    Serial.println(F("#4"));
 
     // ---- Match these settings to your Tag ----
     // Your tag (ESP32_UWB_setup_tag.ino) calls:
@@ -81,15 +85,21 @@ void setup() {
     // setChannel() automatically picks the matching preamble code for that
     // channel/PRF combo (see DW1000Class::setChannel in DW1000.cpp) — for
     // channel 5 @ 16 MHz PRF that's PREAMBLE_CODE_16MHZ_4.
-    DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER); // match Tag
-    DW1000.setChannel(DW1000.CHANNEL_5);                    // match Tag
+    DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);
+    Serial.println(F("#5")); // match Tag
+    DW1000.setChannel(DW1000.CHANNEL_5);  
+    Serial.println(F("#6"));                  // match Tag
 
     DW1000.commitConfiguration();
+    Serial.println(F("#7"));
 
     // Attach callbacks
     DW1000.attachReceivedHandler(handleReceived);
+    Serial.println(F("#8"));
     DW1000.attachReceiveFailedHandler(handleReceiveFailed);
+    Serial.println(F("#9"));
     DW1000.attachReceiveTimeoutHandler(handleReceiveTimeout);
+    Serial.println(F("#10"));
 
     Serial.println(F("# DW1000 initialised. Waiting for frames..."));
     Serial.println(F("# Output: sample,real,imag,magnitude_sq"));
