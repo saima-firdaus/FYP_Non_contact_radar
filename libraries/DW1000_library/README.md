@@ -172,3 +172,16 @@ This is maybe a incomplete list. Please notice that some dependency libraries ma
 License
 -------
 Apache License 2.0 (see [LICENSE.md](https://github.com/thotro/arduino-dw1000/blob/master/LICENSE.md))
+
+Updated for FYP Radar
+-------
+
+* **DW1000.h**
+  Added 2 new functions getStdNoise and readCIR
+
+
+* **DW1000.cpp**
+  Applied the necessary logic for the 2 new functions.
+
+* **DW1000Constants.h**
+  Added the constants for the accumulator.
