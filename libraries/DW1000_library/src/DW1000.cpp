@@ -1552,9 +1552,9 @@ int DW1000Class::readCIR(CIRSample* samples,
     if (!samples || numSamples == 0) return -1;
 
     // Clamp to valid range
-    if ((uint32_t)startSample + numSamples > ACC_MEM_N_SAMPLES_PRF64) {
-        if (startSample >= ACC_MEM_N_SAMPLES_PRF64) return -1;
-        numSamples = ACC_MEM_N_SAMPLES_PRF64 - startSample;
+    if ((uint32_t)startSample + numSamples > ACC_MEM_N_SAMPLES_PRF16) {
+        if (startSample >= ACC_MEM_N_SAMPLES_PRF16) return -1;
+        numSamples = ACC_MEM_N_SAMPLES_PRF16 - startSample;
     }
 
 	// ---- Enable accumulator memory clock via PMSC_CTRL0 ----

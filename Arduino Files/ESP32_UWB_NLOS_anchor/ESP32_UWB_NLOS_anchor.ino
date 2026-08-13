@@ -1,122 +1,157 @@
-// anchor #4 setup — CIR graph variant (minimal)
+// ============================================================
+// CIR_Test.ino
 //
-// Base ranging code unchanged from ESP32_UWB_setup_anchor.ino.
-// Added: raw CIR capture, dumped every range so it can be watched live in
-// Arduino's Serial Plotter. No baseline subtraction, no peak-picking, no
-// calibration — just the raw accumulator, as-is, so you can look at the
-// shape yourself and see where any peaks sit relative to the noise floor.
+// Purpose: Prove that the DW1000 CIR accumulator can be read.
+// Upload to the ANCHOR (receiver) side.
+// The TAG should be running normally and transmitting frames.
 //
-// REQUIRES the DW1000 library patch described in DW1000_library_patch.md
-// (adds DW1000.getAccumulator() and DW1000.getStdNoise()), including the
-// ACC_MEM define — see that file for where to put it.
+// Hardware: Makerfabs DWM1000 on Arduino
+// Library:  thotro arduino-dw1000 (modified with readCIR())
 //
-// HOW TO VIEW: Tools > Serial Plotter, baud set to 460800 (must match
-// Serial.begin() below). Two traces get plotted per sample: "mag" is the
-// CIR magnitude curve itself, "noise" is a flat reference line at the
-// hardware noise-floor level, so you can see directly which bumps in
-// "mag" clear it and which don't.
+// Serial output format (115200 baud):
+//   sample,real,imag,magnitude_sq
+//   0,123,-45,16938
+//   1,127,-51,17722
+//   ...
 //
-// NOTE: dumping ~992 lines per range takes real time even at 460800 baud
-// (roughly a third of a second). If ranging feels like it stalls or the
-// tag drops out while this is running, that's why — this sketch trades
-// ranging speed for a live graph. That's fine for observing peaks by eye;
-// once you know what you're looking for you'll likely want to gate this
-// behind an on-demand command again instead of dumping every range.
+// NOTE: magnitude_sq = I^2 + Q^2 (avoids float sqrt on Arduino)
+// ============================================================
 
 #include <SPI.h>
-#include "DW1000Ranging.h"
-#include "DW1000.h"
+#include <DW1000.h>
 
-// ---------- existing anchor config (unchanged) ----------
-char anchor_addr[] = "84:00:5B:D5:A9:9A:E2:9C"; //#4
-uint16_t Adelay = 16580;
-float dist_m = (285 - 1.75) * 0.0254; //meters
+// ---- Pin definitions for Makerfabs DWM1000 ----
+// Adjust these to match your wiring.
+// Common Makerfabs wiring (verify against your schematic):
+const uint8_t PIN_RST  = 9;    // RESET
+const uint8_t PIN_IRQ  = 2;    // IRQ / interrupt
+const uint8_t PIN_SS   = SS;   // SPI chip select (usually 10 on Uno, or as defined)
 
-#define SPI_SCK 18
-#define SPI_MISO 19
-#define SPI_MOSI 23
-#define DW_CS 4
+// ---- CIR configuration ----
+// How many samples to read per frame.
+// Full accumulator = 1016 samples, but that takes ~200 ms to print at 115200.
+// Start with 200 samples to verify operation, then increase.
+const uint16_t CIR_START_SAMPLE = 0;
+// PRF 16 MHz: max 992 samples; PRF 64 MHz: max 1016 samples.
+// Start with 200 samples to verify operation, increase later.
+const uint16_t CIR_NUM_SAMPLES  = 200;
 
-const uint8_t PIN_RST = 27;
-const uint8_t PIN_IRQ = 34;
-const uint8_t PIN_SS = 4;
+// Sample buffer (on heap to avoid stack overflow)
+static CIRSample cirBuffer[CIR_NUM_SAMPLES];
 
-// ---------- CIR config ----------
-// MODE_LONGDATA_RANGE_LOWPOWER uses TX_PULSE_FREQ_16MHZ -> 992 complex accumulator
-// samples. If you switch to a 64 MHz PRF mode (the *_ACCURACY variants), this
-// becomes 1016 and NUM_CIR_SAMPLES must change accordingly.
-#define NUM_CIR_SAMPLES 992
-#define ACC_BYTES (NUM_CIR_SAMPLES * 4)   // 4 bytes per complex sample (16-bit I + 16-bit Q)
+// State
+volatile boolean rxDone    = false;
+volatile boolean rxFailed  = false;
+static uint32_t  frameCount = 0;
 
-static byte  rawAcc[ACC_BYTES + 1];   // +1 for the ACC_MEM dummy byte
-static float cirMag[NUM_CIR_SAMPLES];
-
-void setup()
-{
-  Serial.begin(460800);
-  delay(1000);
-
-  SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
-  DW1000Ranging.initCommunication(PIN_RST, PIN_SS, PIN_IRQ);
-
-  DW1000.setAntennaDelay(Adelay);
-
-  DW1000Ranging.attachNewRange(newRange);
-  DW1000Ranging.attachNewDevice(newDevice);
-  DW1000Ranging.attachInactiveDevice(inactiveDevice);
-
-  DW1000Ranging.startAsAnchor(anchor_addr, DW1000.MODE_LONGDATA_RANGE_LOWPOWER, false);
-
-  // header row so Serial Plotter labels the two traces
-  Serial.println("mag,noise");
+// ---- Interrupt / callback ----
+void handleReceived() {
+    rxDone = true;
 }
 
-void loop()
-{
-  DW1000Ranging.loop();
+void handleReceiveFailed() {
+    rxFailed = true;
 }
 
-// pulls the CIR + noise floor for the most recently received frame and
-// fills cirMag[]. Returns the noise floor value.
-float captureCIR()
-{
-  float noise = DW1000.getStdNoise();
-  DW1000.getAccumulator(rawAcc, ACC_BYTES, 0);
-
-  // rawAcc[0] is the dummy byte; real samples start at rawAcc[1]
-  for (int i = 0; i < NUM_CIR_SAMPLES; i++) {
-    int off = 1 + i * 4;
-    int16_t re = (int16_t)(rawAcc[off]     | (rawAcc[off + 1] << 8));
-    int16_t im = (int16_t)(rawAcc[off + 2] | (rawAcc[off + 3] << 8));
-    cirMag[i] = sqrtf((float)re * re + (float)im * im);
-  }
-  return noise;
+void handleReceiveTimeout() {
+    rxFailed = true;
 }
 
-void newRange()
-{
-  float noise = captureCIR();
+// ---- Setup ----
+void setup() {
+    Serial.begin(115200);
+    while (!Serial) { ; }  // Wait for Serial (Leonardo/Micro only)
 
-  // one row per sample: mag = CIR magnitude at that delay bin, noise = flat
-  // reference line at the hardware noise-floor level.
-  for (int i = 0; i < NUM_CIR_SAMPLES; i++) {
-    Serial.print(cirMag[i]);
-    Serial.print(",");
-    Serial.println(noise);
-  }
+    Serial.println(F("# DW1000 CIR Test — initialising..."));
+
+    // Initialise DW1000
+    DW1000.begin(PIN_IRQ, PIN_RST);
+    DW1000.select(PIN_SS);
+
+    DW1000.newConfiguration();
+    DW1000.setDefaults();
+
+    // ---- Match these settings to your Tag ----
+    // Your tag (ESP32_UWB_setup_tag.ino) calls:
+    //   DW1000Ranging.startAsTag(tag_addr, DW1000.MODE_LONGDATA_RANGE_LOWPOWER, false);
+    // which is 110 kbps data rate, 16 MHz PRF, 2048 preamble length.
+    // Channel, PRF, data rate, preamble length, and preamble code
+    // MUST be identical on Tag and Anchor, or you will not receive frames.
+    // enableMode() sets data rate + PRF + preamble length together, then
+    // setChannel() automatically picks the matching preamble code for that
+    // channel/PRF combo (see DW1000Class::setChannel in DW1000.cpp) — for
+    // channel 5 @ 16 MHz PRF that's PREAMBLE_CODE_16MHZ_4.
+    DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER); // match Tag
+    DW1000.setChannel(DW1000.CHANNEL_5);                    // match Tag
+
+    DW1000.commitConfiguration();
+
+    // Attach callbacks
+    DW1000.attachReceivedHandler(handleReceived);
+    DW1000.attachReceiveFailedHandler(handleReceiveFailed);
+    DW1000.attachReceiveTimeoutHandler(handleReceiveTimeout);
+
+    Serial.println(F("# DW1000 initialised. Waiting for frames..."));
+    Serial.println(F("# Output: sample,real,imag,magnitude_sq"));
+
+    // Start receiver
+    DW1000.startReceive();
 }
 
-void newDevice(DW1000Device *device)
-{
-  // kept quiet on purpose — text lines mixed into numeric CIR rows will
-  // confuse Serial Plotter's parser. Uncomment if you need it for debugging,
-  // then comment back out before watching the graph.
-  // Serial.print("Device added: ");
-  // Serial.println(device->getShortAddress(), HEX);
-}
+// ---- Main loop ----
+void loop() {
+    if (rxFailed) {
+        rxFailed = false;
+        // Restart receiver on error
+        DW1000.startReceive();
+        return;
+    }
 
-void inactiveDevice(DW1000Device *device)
-{
-  // Serial.print("Delete inactive device: ");
-  // Serial.println(device->getShortAddress(), HEX);
+    if (!rxDone) {
+        return;  // Nothing received yet
+    }
+
+    rxDone = false;
+    frameCount++;
+
+    // ================================================================
+    // IMPORTANT: Read the CIR BEFORE calling any function that
+    // re-enables the receiver or clears RX status.
+    // The accumulator is valid from RXDFR/LDEDONE until TRXOFF or
+    // a new RX enable.
+    // ================================================================
+
+    // Read CIR from accumulator
+    int samplesRead = DW1000.readCIR(cirBuffer, CIR_START_SAMPLE, CIR_NUM_SAMPLES);
+
+    if (samplesRead <= 0) {
+        Serial.println(F("# ERROR: readCIR returned 0 or error"));
+        DW1000.startReceive();
+        return;
+    }
+
+    // Print header
+    Serial.print(F("# Frame "));
+    Serial.println(frameCount);
+    Serial.println(F("sample,real,imag,magnitude_sq"));
+
+    // Print CIR data
+    for (int i = 0; i < samplesRead; i++) {
+        int32_t I = (int32_t)cirBuffer[i].real;
+        int32_t Q = (int32_t)cirBuffer[i].imag;
+        int32_t magSq = I*I + Q*Q;  // magnitude squared (avoids sqrt)
+
+        Serial.print(CIR_START_SAMPLE + i);
+        Serial.print(',');
+        Serial.print(cirBuffer[i].real);
+        Serial.print(',');
+        Serial.print(cirBuffer[i].imag);
+        Serial.print(',');
+        Serial.println(magSq);
+    }
+
+    Serial.println(F("# END"));
+
+    // Re-enable receiver for next frame
+    DW1000.startReceive();
 }
