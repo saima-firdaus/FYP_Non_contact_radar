@@ -1545,74 +1545,202 @@ float DW1000Class::getStdNoise() {
     noise = (uint16_t)noiseBytes[0] | ((uint16_t)noiseBytes[1] << 8);
     return (float)noise;
 }
+
+/* ##### CIR / accumulator ################################################## */
+ 
+/**
+ * First path index as reported by the LDE algorithm.
+ * RX_TIME (0x15) sub-register 0x05, 16 bits.
+ * Format: 10 MSBs = whole samples, 6 LSBs = fraction (i.e. units of 1/64 sample).
+ * Only valid after LDEDONE for the current frame.
+ */
+uint16_t DW1000Class::getFirstPathIndex() {
+	byte fpIndexBytes[LEN_FP_INDEX];
+	readBytes(RX_TIME, FP_INDEX_SUB, fpIndexBytes, LEN_FP_INDEX);
+	return (uint16_t)fpIndexBytes[0] | ((uint16_t)fpIndexBytes[1] << 8);
+}
+ 
+/** Integer (whole-sample) part of the first path index. */
+uint16_t DW1000Class::getFirstPathIndexInteger() {
+	return getFirstPathIndex() >> 6;
+}
+ 
+/**
+ * Preamble Accumulation Count (RXPACC), RX_FINFO (0x10) bits 31:20.
+ * The accumulator is a coherent sum over this many preamble symbols, so
+ * dividing the CIR magnitude by RXPACC makes frames comparable to each other.
+ */
+uint16_t DW1000Class::getPreambleAccumulationCount() {
+	byte rxFrameInfo[LEN_RX_FINFO];
+	readBytes(RX_FINFO, NO_SUB, rxFrameInfo, LEN_RX_FINFO);
+	return (uint16_t)((rxFrameInfo[2] >> 4) & 0x0F) | ((uint16_t)rxFrameInfo[3] << 4);
+}
+ 
+/**
+ * Turn the accumulator access clocks on (true) or restore them (false).
+ *
+ * ON:   RXCLKS[3:2] = 10  (force RX clock from the 125 MHz PLL)
+ *       FACE[6]     = 1   (force accumulator clock enable)
+ *       AMCE[15]    = 1   (accumulator memory clock enable)
+ *
+ * Mirrors _dwt_enableclocks(READ_ACC_ON / READ_ACC_OFF) in Decawave's driver.
+ * Only bytes 0 and 1 of PMSC_CTRL0 are touched — byte 3 holds SOFTRESET and
+ * must never be blind-written back.
+ */
+void DW1000Class::enableAccumulatorClocks(boolean on) {
+	byte pmsc[2];
+	readBytes(PMSC, PMSC_CTRL0_SUB, pmsc, 2);
+ 
+	if (on) {
+		pmsc[0] = 0x48 | (pmsc[0] & 0xB3);  // clear RXCLKS+FACE, then set RXCLKS=10, FACE=1
+		pmsc[1] = 0x80 | pmsc[1];           // AMCE = 1
+	} else {
+		pmsc[0] = pmsc[0] & 0xB3;           // RXCLKS -> auto, FACE = 0
+		pmsc[1] = pmsc[1] & 0x7F;           // AMCE = 0
+	}
+ 
+	// Low byte first, one byte per transaction — as the reference driver does.
+	writeBytes(PMSC, PMSC_CTRL0_SUB,     &pmsc[0], 1);
+	writeBytes(PMSC, PMSC_CTRL0_SUB + 1, &pmsc[1], 1);
+}
+ 
+/**
+ * Read complex CIR samples out of the accumulator (register file 0x25, ACC_MEM).
+ *
+ * @param samples      caller-provided array, at least numSamples entries
+ * @param startSample  first accumulator tap to read (0 .. 991 or 0 .. 1015)
+ * @param numSamples   how many taps to read
+ * @return             number of samples actually written, or -1 on error
+ *
+ * Must be called after RXDFR/LDEDONE and before the receiver is re-enabled.
+ */
 int DW1000Class::readCIR(CIRSample* samples,
-                          uint16_t   startSample,
-                          uint16_t   numSamples)
+                         uint16_t   startSample,
+                         uint16_t   numSamples)
 {
-    if (!samples || numSamples == 0) return -1;
-
-    // Clamp to valid range
-    if ((uint32_t)startSample + numSamples > ACC_MEM_N_SAMPLES_PRF16) {
-        if (startSample >= ACC_MEM_N_SAMPLES_PRF16) return -1;
-        numSamples = ACC_MEM_N_SAMPLES_PRF16 - startSample;
-    }
-
-	// ---- Enable accumulator memory clock via PMSC_CTRL0 ----
-	byte pmscctrl0[LEN_PMSC_CTRL0];
-	memset(pmscctrl0, 0, LEN_PMSC_CTRL0);
-	readBytes(PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
-
-	byte pmscctrl0_saved[LEN_PMSC_CTRL0];
-	memcpy(pmscctrl0_saved, pmscctrl0, LEN_PMSC_CTRL0);
-
-	// RXCLKS [3:2] = 01  →  force receiver clock on  (byte[0] bits 3:2)
-	pmscctrl0[0] &= ~0x0C;   // clear bits 3:2
-	pmscctrl0[0] |=  0x04;   // set  bit  2  (RXCLKS = 0b01)
-
-	// FACE   [6]   = 1   →  force accumulator clock enable  (byte[0] bit 6)
-	pmscctrl0[0] |=  0x40;   // set bit 6
-
-	// AMCE   [16]  = 1   →  accumulator memory clock enable  (byte[2] bit 0)
-	pmscctrl0[2] |=  0x01;   // set bit 0 of byte[2]
-
-	writeBytes(PMSC, PMSC_CTRL0_SUB, pmscctrl0, LEN_PMSC_CTRL0);
-	delayMicroseconds(5);
-    // ---- Read accumulator in 64-sample chunks ----
-    // 64 samples × 4 bytes + 1 dummy byte = 257 bytes per chunk.
-    // Keeps the stack buffer small enough for ESP32 and Arduino.
-    const uint16_t CHUNK = 64;
-    uint16_t totalRead = 0;
-
-    for (uint16_t i = 0; i < numSamples; i += CHUNK) {
-        uint16_t thisChunk = numSamples - i;
-        if (thisChunk > CHUNK) thisChunk = CHUNK;
-
-        uint16_t byteOffset = (startSample + i) * ACC_MEM_BYTES_PER_SAMPLE;
-        uint16_t rawLen     = thisChunk * ACC_MEM_BYTES_PER_SAMPLE + ACC_MEM_DUMMY_BYTE;
-
-        byte raw[257];
-        memset(raw, 0, rawLen);
-
-        // readBytes() builds the correct 3-byte SPI header automatically
-        // when byteOffset >= 128 (confirmed: same mechanism used by manageLDE etc.)
-        readBytes(ACC_MEM, byteOffset, raw, rawLen);
-
-        // raw[0] is the mandatory dummy byte — skip it.
-        byte* p = raw + ACC_MEM_DUMMY_BYTE;
-
-        for (uint16_t j = 0; j < thisChunk; j++) {
-            // Layout: [I_low][I_high][Q_low][Q_high]  (little-endian, signed)
-            samples[i + j].real = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-            samples[i + j].imag = (int16_t)((uint16_t)p[2] | ((uint16_t)p[3] << 8));
-            p += ACC_MEM_BYTES_PER_SAMPLE;
-        }
-        totalRead += thisChunk;
-    }
-
-    // ---- Restore original PMSC_CTRL0 ----
-    writeBytes(PMSC, PMSC_CTRL0_SUB, pmscctrl0_saved, LEN_PMSC_CTRL0);
-
-    return (int)totalRead;
+	if (!samples || numSamples == 0) return -1;
+ 
+	// ---- Clamp to the number of valid taps for the configured PRF ----
+	const uint16_t maxSamples = (_pulseFrequency == TX_PULSE_FREQ_16MHZ)
+	                            ? ACC_MEM_N_SAMPLES_PRF16    // 992
+	                            : ACC_MEM_N_SAMPLES_PRF64;   // 1016
+	if (startSample >= maxSamples) return -1;
+	if ((uint32_t)startSample + numSamples > maxSamples) {
+		numSamples = maxSamples - startSample;
+	}
+ 
+	// ---- Park the receiver ------------------------------------------------
+	// ACC_MEM is live RAM. If the RX state machine is hunting preamble it is
+	// actively overwriting the buffer while we read it. TRXOFF freezes it.
+	idle();
+ 
+	// ---- Enable the accumulator access clocks -----------------------------
+	enableAccumulatorClocks(true);
+ 
+	// ---- Burst-read the accumulator in chunks -----------------------------
+	// Every SPI read of ACC_MEM returns one leading dummy octet (internal
+	// memory access latency). Each chunk here is its own SPI transaction with
+	// its own address header and its own CS cycle, so each chunk gets its own
+	// dummy byte. That is what ACC_MEM_DUMMY_BYTE accounts for below.
+	const uint16_t CHUNK = 64;                       // 64 samples = 256 bytes + 1 dummy
+	uint16_t totalRead = 0;
+ 
+	for (uint16_t i = 0; i < numSamples; i += CHUNK) {
+		uint16_t thisChunk = numSamples - i;
+		if (thisChunk > CHUNK) thisChunk = CHUNK;
+ 
+		const uint16_t byteOffset = (startSample + i) * ACC_MEM_BYTES_PER_SAMPLE;
+		const uint16_t rawLen     = thisChunk * ACC_MEM_BYTES_PER_SAMPLE + ACC_MEM_DUMMY_BYTE;
+ 
+		byte raw[CHUNK * ACC_MEM_BYTES_PER_SAMPLE + ACC_MEM_DUMMY_BYTE];  // 257 bytes
+ 
+		// readBytes() emits the 3-byte extended sub-address header automatically
+		// for offsets >= 128, which is required here: offsets run to 4063.
+		readBytes(ACC_MEM, byteOffset, raw, rawLen);
+ 
+		const byte* p = raw + ACC_MEM_DUMMY_BYTE;   // skip the dummy octet
+ 
+		for (uint16_t j = 0; j < thisChunk; j++) {
+			// Layout per tap: [I_lo][I_hi][Q_lo][Q_hi], little-endian,
+			// both parts signed 16-bit two's complement.
+			samples[i + j].real = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+			samples[i + j].imag = (int16_t)((uint16_t)p[2] | ((uint16_t)p[3] << 8));
+			p += ACC_MEM_BYTES_PER_SAMPLE;
+		}
+		totalRead += thisChunk;
+	}
+ 
+	// ---- Restore the clocks ----------------------------------------------
+	enableAccumulatorClocks(false);
+ 
+	return (int)totalRead;
+}
+ 
+/**
+ * Convenience wrapper: read a window centred on the LDE first path.
+ *
+ * @param samples     output array, at least (samplesBefore + samplesAfter) entries
+ * @param samplesBefore  taps to include before the first path (e.g. 20)
+ * @param samplesAfter   taps to include from the first path onward (e.g. 180)
+ * @param outStartIndex  receives the absolute accumulator index of samples[0]
+ * @return               number of samples written, or -1 on error
+ */
+int DW1000Class::readCIRAroundFirstPath(CIRSample* samples,
+                                        uint16_t   samplesBefore,
+                                        uint16_t   samplesAfter,
+                                        uint16_t*  outStartIndex)
+{
+	const uint16_t fpInt = getFirstPathIndexInteger();
+	uint16_t start = (fpInt > samplesBefore) ? (uint16_t)(fpInt - samplesBefore) : 0;
+	if (outStartIndex) *outStartIndex = start;
+	return readCIR(samples, start, (uint16_t)(samplesBefore + samplesAfter));
+}
+ 
+/**
+ * Debug helper. Prints DEV_ID and PMSC_CTRL0 before / during / after the
+ * accumulator clock enable, so "the SPI bus is sick" can be told apart from
+ * "the clock-enable write is not sticking".
+ *
+ * Expected healthy output:
+ *   DEV_ID          = DECA0130   (all three reads identical)
+ *   PMSC before     = xxxxxxxx
+ *   PMSC with clks  = byte0 has bits[3:2]=10 and bit6=1;  byte1 has bit7=1
+ *                     i.e. (byte0 & 0x4C) == 0x48  and  (byte1 & 0x80) == 0x80
+ *   PMSC after      = same as "before"
+ */
+void DW1000Class::verifyAccumulatorAccess() {
+	char idBuf[128];
+	byte pmsc[4];
+ 
+	getPrintableDeviceIdentifier(idBuf);
+	Serial.print(F("# DEV_ID (before)      : ")); Serial.println(idBuf);
+ 
+	readBytes(PMSC, PMSC_CTRL0_SUB, pmsc, 4);
+	Serial.print(F("# PMSC_CTRL0 (before)  : 0x"));
+	for (int i = 3; i >= 0; i--) { if (pmsc[i] < 0x10) Serial.print('0'); Serial.print(pmsc[i], HEX); }
+	Serial.println();
+ 
+	enableAccumulatorClocks(true);
+ 
+	readBytes(PMSC, PMSC_CTRL0_SUB, pmsc, 4);
+	Serial.print(F("# PMSC_CTRL0 (clks on) : 0x"));
+	for (int i = 3; i >= 0; i--) { if (pmsc[i] < 0x10) Serial.print('0'); Serial.print(pmsc[i], HEX); }
+	Serial.print(F("   RXCLKS="));  Serial.print((pmsc[0] >> 2) & 0x03, BIN);
+	Serial.print(F(" FACE="));      Serial.print((pmsc[0] >> 6) & 0x01);
+	Serial.print(F(" AMCE="));      Serial.print((pmsc[1] >> 7) & 0x01);
+	Serial.println();
+ 
+	const boolean ok = (((pmsc[0] & 0x4C) == 0x48) && ((pmsc[1] & 0x80) == 0x80));
+	Serial.println(ok ? F("# ACC clock enable  : OK")
+	                  : F("# ACC clock enable  : *** FAILED — write did not stick ***"));
+ 
+	getPrintableDeviceIdentifier(idBuf);
+	Serial.print(F("# DEV_ID (clks on)     : ")); Serial.println(idBuf);
+ 
+	enableAccumulatorClocks(false);
+ 
+	getPrintableDeviceIdentifier(idBuf);
+	Serial.print(F("# DEV_ID (after)       : ")); Serial.println(idBuf);
 }
 
 

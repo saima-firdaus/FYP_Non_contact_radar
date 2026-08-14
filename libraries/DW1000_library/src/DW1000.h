@@ -279,7 +279,16 @@ public:
 	static float getReceiveQuality();
 	static float getStdNoise();
 	static int readCIR(CIRSample* samples, uint16_t startSample, uint16_t numSamples);
-	
+	static int readCIRAroundFirstPath(CIRSample* samples,
+	                                  uint16_t   samplesBefore,
+	                                  uint16_t   samplesAfter,
+	                                  uint16_t*  outStartIndex);
+	static uint16_t getFirstPathIndex();           // units of 1/64 sample
+	static uint16_t getFirstPathIndexInteger();    // whole samples
+	static uint16_t getPreambleAccumulationCount();// RXPACC
+	static void     enableAccumulatorClocks(boolean on);
+	static void     verifyAccumulatorAccess();     // debug read-back
+
 	/* interrupt management. */
 	static void interruptOnSent(boolean val);
 	static void interruptOnReceived(boolean val);

@@ -114,6 +114,8 @@
 #define FP_AMPL1_SUB                0x07
 #define LEN_RX_STAMP                LEN_STAMP
 #define LEN_FP_AMPL1                2
+#define FP_INDEX_SUB                0x05   // RX_TIME (0x15) offset 5, 16-bit first path index
+#define LEN_FP_INDEX                2
 
 // RX frame quality
 #define RX_FQUAL                    0x12
