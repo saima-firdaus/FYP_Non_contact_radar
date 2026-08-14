@@ -38,7 +38,7 @@ while toc(tStart) < CAPTURE_SECONDS
             continue
         end
 
-        % Data row: "sample,real,imag,magSq"
+        % Data row: "sample,real,imag,mag"
         parts = str2double(strsplit(line, ","));
         if ~isnan(currentFrame) && numel(parts) == 4 && ~any(isnan(parts))
             frames(currentFrame) = [frames(currentFrame); parts];
@@ -56,7 +56,7 @@ for k = sort(keys)
     if isempty(data)
         continue
     end
-    T = array2table(data, 'VariableNames', {'sample','real','imag','magnitude_sq'});
+    T = array2table(data, 'VariableNames', {'sample','real','imag','magnitude'});
     fname = sprintf('frame_%04d.csv', k);
     writetable(T, fname);
     fprintf("Saved %s (%d samples)\n", fname, height(T));
@@ -65,7 +65,7 @@ for k = sort(keys)
 end
 
 xlabel('CIR Sample Index');
-ylabel('Magnitude^2 (I^2 + Q^2)');
+ylabel('Amplitude');
 title('DW1000 CIR Accumulator Output');
 legend show;
 saveas(gcf, 'cir_plot.png');

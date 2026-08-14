@@ -19,6 +19,7 @@
 
 #include <SPI.h>
 #include <DW1000.h>
+#include <math.h>
 
 // ---- Pin definitions for Makerfabs DWM1000 ----
 // Adjust these to match your wiring.
@@ -81,7 +82,7 @@ void setup() {
     // setChannel() automatically picks the matching preamble code for that
     // channel/PRF combo (see DW1000Class::setChannel in DW1000.cpp) — for
     // channel 5 @ 16 MHz PRF that's PREAMBLE_CODE_16MHZ_4.
-    DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);match Tag
+    DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER); // match Tag
     DW1000.setChannel(DW1000.CHANNEL_5);  
     DW1000.commitConfiguration();
 
@@ -132,13 +133,14 @@ void loop() {
     // Print header
     Serial.print(F("# Frame "));
     Serial.println(frameCount);
-    Serial.println(F("sample,real,imag,magnitude_sq"));
+    Serial.println(F("sample,real,imag,amplitude"));
 
     // Print CIR data
     for (int i = 0; i < samplesRead; i++) {
         int32_t I = (int32_t)cirBuffer[i].real;
         int32_t Q = (int32_t)cirBuffer[i].imag;
-        int32_t magSq = I*I + Q*Q;  // magnitude squared (avoids sqrt)
+        int32_t mag = I*I + Q*Q;               // magnitude squared
+        float amplitude = sqrtf((float)mag);   // true amplitude, matches CIR plots
 
         Serial.print(CIR_START_SAMPLE + i);
         Serial.print(',');
@@ -146,7 +148,7 @@ void loop() {
         Serial.print(',');
         Serial.print(cirBuffer[i].imag);
         Serial.print(',');
-        Serial.println(magSq);
+        Serial.println(amplitude, 2);
     }
 
     Serial.println(F("# END"));
