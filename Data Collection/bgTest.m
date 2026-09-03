@@ -16,29 +16,46 @@ numSamples = height(first);   % now guaranteed identical across all files
 bgReal = zeros(numSamples, numel(bgFiles));
 bgImag = zeros(numSamples, numel(bgFiles));
 
-for k = 1:numel(bgFiles)
+%% step 1
+numBgFrames = length(bgFiles);
+bgRealNorm = zeros(numSamples, numBgFrames);
+bgImagNorm = zeros(numSamples, numBgFrames);
+
+for k = 1:numBgFrames
     T = readtable(fullfile(bgFolder, bgFiles(k).name));
-    bgReal(:,k) = T.real;
-    bgImag(:,k) = T.imag;
+
+    validRows = T.amplitude > 50;
+    rxpaccEst = median(T.amplitude(validRows) ./ T.amplitude_norm(validRows));
+
+    bgRealNorm(:,k) = T.real / rxpaccEst;
+    bgImagNorm(:,k) = T.imag / rxpaccEst;
+    disp(rxpaccEst)
 end
 
-meanBgReal = mean(bgReal, 2);
-meanBgImag = mean(bgImag, 2);
-meanBgComplex = meanBgReal + 1i*meanBgImag;
+meanBgReal = mean(bgRealNorm, 2);
+meanBgImag = mean(bgImagNorm, 2);
+meanBgComplex = meanBgReal + 1i*meanBgImag;   % normalized background reference
 
 %% Step 2: Subtract Background from Each Object Frame & Export
 numObjFrames = length(objFiles);
 subAmplitude = zeros(numSamples, numObjFrames);
+
 for k = 1:numObjFrames
     filePath = fullfile(objFolder, objFiles(k).name);
     T_obj = readtable(filePath);
-    
-    % Express current frame as complex numbers
-    Z_obj = T_obj.real + 1i * T_obj.imag;
-    
-    % Coherent subtraction
+
+    % Recover this frame's RXPACC and normalize its real/imag
+    validRows = T_obj.amplitude > 50;
+    rxpaccEst = median(T_obj.amplitude(validRows) ./ T_obj.amplitude_norm(validRows));
+    realNorm = T_obj.real / rxpaccEst;
+    imagNorm = T_obj.imag / rxpaccEst;
+
+    % Express normalized frame as complex numbers
+    Z_obj = realNorm + 1i * imagNorm;
+
+    % Coherent subtraction (now both sides are RXPACC-normalized)
     Z_sub = Z_obj - meanBgComplex;
-    
+
     % Update table variables with residual data
     T_sub = T_obj;
     T_sub.real = real(Z_sub);
@@ -46,9 +63,6 @@ for k = 1:numObjFrames
     T_sub.amplitude = abs(Z_sub);
     T_sub.amplitude_norm = T_sub.amplitude / max(T_sub.amplitude);
     subAmplitude(:,k) = T_sub.amplitude;
-    % Save subtracted table to the output directory
-    % outputPath = fullfile(outputFolder, objFiles(k).name);
-    % writetable(T_sub, outputPath);
 end
 % subAmplitude_norm = subAmplitude / max(subAmplitude(:));
 

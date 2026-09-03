@@ -10,7 +10,7 @@
 close all; clear all; clc;
 
 bgFolder     = 'Test 11/1 - closer to door';
-objFolder    = 'Test 11/2 - TX closer to door';
+objFolder    = 'Test 11/6 - same as 5';
 outputFolder = 'Test New - Aligned';
 
 bgOutFolder  = fullfile(outputFolder, 'bg');
