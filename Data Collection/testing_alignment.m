@@ -10,7 +10,7 @@
 close all; clear all; clc;
 
 bgFolder     = 'Test 11/1 - closer to door';
-objFolder    = 'Test 11/6 - same as 5';
+objFolder    = 'Test 11/2 - TX closer to door';
 outputFolder = 'Test New - Aligned';
 
 bgOutFolder  = fullfile(outputFolder, 'bg');
@@ -20,6 +20,8 @@ if ~exist(objOutFolder,'dir'),  mkdir(objOutFolder); end
 
 bgFiles  = dir(fullfile(bgFolder,  '*.csv'));
 objFiles = dir(fullfile(objFolder, '*.csv'));
+bgFiles  = sortFramesByNumber(bgFiles);
+objFiles = sortFramesByNumber(objFiles);
 
 noiseWindowLen = 15;   % samples assumed to precede first path — tune to your data
 threshFactor   = 6;    % sigma multiplier above noise floor
@@ -96,4 +98,14 @@ function fpIdx = estimateFirstPath(sampleVec, ampVec, noiseWindowLen, threshFact
         [~, idx] = max(ampVec);
     end
     fpIdx = sampleVec(idx);
+end
+function filesSorted = sortFramesByNumber(files)
+    names = {files.name};
+    nums = zeros(numel(names),1);
+    for i = 1:numel(names)
+        tok = regexp(names{i}, '(\d+)', 'match');
+        nums(i) = str2double(tok{end});   % last numeric group in the filename
+    end
+    [~, order] = sort(nums);
+    filesSorted = files(order);
 end

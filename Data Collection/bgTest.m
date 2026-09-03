@@ -29,7 +29,7 @@ for k = 1:numBgFrames
 
     bgRealNorm(:,k) = T.real / rxpaccEst;
     bgImagNorm(:,k) = T.imag / rxpaccEst;
-    disp(rxpaccEst)
+    % disp(rxpaccEst)
 end
 
 meanBgReal = mean(bgRealNorm, 2);

@@ -8,7 +8,7 @@
 %   sample,real,imag,amplitude,amplitude_norm
 %
 % Usage: set PORT below, then run.
-
+delay(30000)
 PORT = "COM4";
 BAUD = 921600;              % must match Serial.begin() in the sketch
 CAPTURE_SECONDS = 30;
