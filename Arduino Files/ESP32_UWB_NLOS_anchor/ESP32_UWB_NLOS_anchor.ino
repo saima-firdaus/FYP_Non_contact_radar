@@ -29,8 +29,8 @@ const uint8_t PIN_SS  = 4;
 // The DW1000 arranges the accumulator so the LDE first path lands near tap 750.
 // Reading from tap 0 gives you nothing but pre-arrival noise, so the window is
 // anchored on FP_INDEX instead of on a fixed start.
-const uint16_t CIR_BEFORE_FP = 20;    // taps of noise floor before the first path
-const uint16_t CIR_AFTER_FP  = 180;   // taps from the first path onward
+const uint16_t CIR_BEFORE_FP = 50;    // was 20  -> starts ~tap 700
+const uint16_t CIR_AFTER_FP  = 100;
 const uint16_t CIR_LEN       = CIR_BEFORE_FP + CIR_AFTER_FP;
 
 static CIRSample cirBuffer[CIR_LEN];
