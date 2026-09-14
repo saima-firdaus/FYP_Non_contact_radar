@@ -55,7 +55,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. MEASURE
 % THIS for every capture - the reflector-offset conversion below is wrong if
 % it is wrong, and it is recorded in frame_metadata.csv for traceability.
-TAG_ANCHOR_DIST_M = 0.3;
+TAG_ANCHOR_DIST_M = 0.6;
 
 % ---- Plot window ---------------------------------------------------------
 % Absolute accumulator taps to display in the top axes. Must lie inside what
@@ -172,7 +172,7 @@ if nRejected > 0
 end
 
 % ---- Save + plot ---------------------------------------------------------
-fig = figure('Color','w','Position',[100 60 900 950]);
+fig = figure('Position',[100 60 900 950]);
 tiledlayout(3,1);
 
 ax1 = nexttile; hold(ax1,'on'); grid(ax1,'on');   % absolute tap, every frame
