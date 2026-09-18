@@ -55,7 +55,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. MEASURE
 % THIS for every capture - the reflector-offset conversion below is wrong if
 % it is wrong, and it is recorded in frame_metadata.csv for traceability.
-TAG_ANCHOR_DIST_M = 0.6;
+TAG_ANCHOR_DIST_M = 1;
 
 % ---- Plot window ---------------------------------------------------------
 % Absolute accumulator taps to display in the top axes. Must lie inside what
@@ -65,8 +65,8 @@ PLOT_TAP_MIN     = 720;
 PLOT_TAP_MAX     = 850;
 
 % Taps either side of the LDE first path for the aligned axes.
-TAPS_BEFORE_FP   = 50;          % matches CIR_BEFORE_FP
-TAPS_AFTER_FP    = 100;         % matches CIR_AFTER_FP
+TAPS_BEFORE_FP   = 20;          % matches CIR_BEFORE_FP
+TAPS_AFTER_FP    = 180;         % matches CIR_AFTER_FP
 
 % One accumulator tap = 1.0016 ns = 30.028 cm of propagation.
 TAP_TO_METRES    = 0.30028;

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:manuals.plus)",
+      "WebSearch",
+      "Bash(curl -s -o /tmp/dw1000um.pdf --max-time 15 https://thetoolchain.com/mirror/dw1000/dw1000_user_manual_v2.05.pdf)",
+      "Read(//tmp/**)",
+      "Read(//c/Users/saima/.platformio/**)",
+      "Read(//c/Users/saima/.platformio/penv/Scripts/**)",
+      "Read(//c//**)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

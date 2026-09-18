@@ -1,0 +1,7 @@
+FRAME,RX_TS,FP_INDEX,FP_INT,RXPACC,RXPWR,START,tag_anchor_dist_m,n_samples,raw_csv,aligned_csv
+1,2051135420,747.5312,747,1260,-60.65,727,1,200,01_raw_frames\frame_0001.csv,02_lde_aligned\frame_0001_aligned.csv
+2,8440882255,749.5781,749,1203,-60.94,729,1,200,01_raw_frames\frame_0002.csv,02_lde_aligned\frame_0002_aligned.csv
+3,14830737654,753.1875,753,1215,-60.55,733,1,200,01_raw_frames\frame_0003.csv,02_lde_aligned\frame_0003_aligned.csv
+4,21220539281,746.3594,746,1198,-59.91,726,1,200,01_raw_frames\frame_0004.csv,02_lde_aligned\frame_0004_aligned.csv
+5,27610286099,748.6406,748,1000,-59.49,728,1,200,01_raw_frames\frame_0005.csv,02_lde_aligned\frame_0005_aligned.csv
+6,34000141962,751,751,1220,-60.11,731,1,200,01_raw_frames\frame_0006.csv,02_lde_aligned\frame_0006_aligned.csv
