@@ -55,7 +55,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. MEASURE
 % THIS for every capture - the reflector-offset conversion below is wrong if
 % it is wrong, and it is recorded in frame_metadata.csv for traceability.
-TAG_ANCHOR_DIST_M = 0.70;
+TAG_ANCHOR_DIST_M = 0.3;
 
 % ---- Plot ----------------------------------------------------------------
 % The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
@@ -182,7 +182,14 @@ if nRejected > 0
     fprintf("Discarded %d malformed sample line(s).\n", nRejected);
 end
 
-% ---- Save ----------------------------------------------------------------
+% ---- Save + plot ---------------------------------------------------------
+fig = figure('Color','w','Position',[100 60 900 950]);
+tiledlayout(3,1);
+
+ax1 = nexttile; hold(ax1,'on'); grid(ax1,'on');   % absolute tap, every frame
+ax2 = nexttile; hold(ax2,'on'); grid(ax2,'on');   % excess path length, mean
+ax3 = nexttile; hold(ax3,'on'); grid(ax3,'on');   % reflector offset, mean
+
 ks = sort(cell2mat(frames.keys));
 plotFrame = struct('n', NaN, 'sample', [], 'amp', []);
 metaRows    = {};
