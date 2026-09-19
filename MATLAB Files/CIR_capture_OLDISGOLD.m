@@ -1,4 +1,4 @@
-% cir_live_capture.m
+% 
 %
 % Live-captures DW1000 CIR frames from the ESP32 anchor over serial, parses
 % them, saves each frame to CSV, and plots amplitude vs accumulator index.
