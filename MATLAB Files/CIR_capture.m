@@ -41,8 +41,8 @@
 
 PORT             = "COM4";
 BAUD             = 921600;      % must match Serial.begin() in the sketch
-CAPTURE_SECONDS  = 30;
-STARTUP_DELAY_S  = 10;          % time to let the anchor boot before listening
+CAPTURE_SECONDS  = 10;
+STARTUP_DELAY_S  = 5;          % time to let the anchor boot before listening
 OUTPUT_ROOT      = pwd;         % parent directory for the Capture_* folders
 
 % ---- Subdirectory names --------------------------------------------------
@@ -55,14 +55,26 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. MEASURE
 % THIS for every capture - the reflector-offset conversion below is wrong if
 % it is wrong, and it is recorded in frame_metadata.csv for traceability.
-TAG_ANCHOR_DIST_M = 0.3;
+TAG_ANCHOR_DIST_M = 0.70;
 
-% ---- Plot window ---------------------------------------------------------
-% Absolute accumulator taps to display in the top axes. Must lie inside what
-% the sketch actually captured (CIR_BEFORE_FP / CIR_AFTER_FP), otherwise you
-% are zooming into a region the anchor never transmitted.
-PLOT_TAP_MIN     = 720;
-PLOT_TAP_MAX     = 850;
+% ---- Plot ----------------------------------------------------------------
+% The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
+% the absolute accumulator axis, with the three reported LDE diagnostics
+% drawn on top - first path (red), peak path (black diamond) and the noise
+% threshold (cyan).
+%
+% Amplitudes are the RAW accumulator magnitude |I+jQ|, not amplitude/RXPACC.
+% That is what the application note plots, it puts the y-axis on the same
+% x10^4 scale, and it is the only scale on which STD_NOISE x NTM is a
+% meaningful threshold.
+ANCHOR_ID        = 5;           % for the title, e.g. "Anchor 5  Blink 215"
+PLOT_FRAME       = [];          % frame number to plot; [] = the first one
+
+% Absolute accumulator taps to display. Empty auto-fits to the captured
+% window. Must lie inside what the sketch captured (CIR_BEFORE_FP /
+% CIR_AFTER_FP), otherwise you are zooming into a region never transmitted.
+PLOT_TAP_MIN     = [];
+PLOT_TAP_MAX     = [];
 
 % Taps either side of the LDE first path for the aligned axes.
 TAPS_BEFORE_FP   = 50;          % matches CIR_BEFORE_FP
@@ -76,7 +88,6 @@ TAP_TO_METRES    = 0.30028;
 % share a common delay axis. Each frame is resampled onto this uniform grid
 % of taps-relative-to-FP before averaging.
 MEAN_GRID_STEP   = 0.5;         % taps
-SHOW_STD_BAND    = true;        % shade +/- 1 standard deviation
 
 % NOTE: the original script called delay(30000), which is an Arduino
 % function, not a MATLAB one. pause() takes seconds.
@@ -171,15 +182,9 @@ if nRejected > 0
     fprintf("Discarded %d malformed sample line(s).\n", nRejected);
 end
 
-% ---- Save + plot ---------------------------------------------------------
-fig = figure('Color','w','Position',[100 60 900 950]);
-tiledlayout(3,1);
-
-ax1 = nexttile; hold(ax1,'on'); grid(ax1,'on');   % absolute tap, every frame
-ax2 = nexttile; hold(ax2,'on'); grid(ax2,'on');   % excess path length, mean
-ax3 = nexttile; hold(ax3,'on'); grid(ax3,'on');   % reflector offset, mean
-
+% ---- Save ----------------------------------------------------------------
 ks = sort(cell2mat(frames.keys));
+plotFrame = struct('n', NaN, 'sample', [], 'amp', []);
 metaRows    = {};
 nIncomplete = 0;
 D           = TAG_ANCHOR_DIST_M;
@@ -241,8 +246,15 @@ for k = ks
     mr.aligned_csv = string(fullfile(ALIGNED_SUBDIR, alignedName));
     metaRows{end+1} = mr; %#ok<SAGROW>
 
-    % ---- Top panel keeps every frame, unaveraged -------------------------
-    plot(ax1, data(:,1), data(:,4), 'DisplayName', sprintf('Frame %d', k));
+    % ---- Keep one frame aside for the APS006-style figure ----------------
+    % Raw magnitude, not amplitude/RXPACC: the noise threshold is in raw
+    % accumulator units and has to be plotted against the same scale.
+    if (isempty(PLOT_FRAME) && isnan(plotFrame.n)) || isequal(PLOT_FRAME, k)
+        plotFrame.n      = k;
+        plotFrame.sample = data(:,1);
+        plotFrame.amp    = data(:,4);
+        plotFrame.meta   = m;
+    end
 
     % ---- Resample onto the common grid for the average -------------------
     % Non-coherent (magnitude) averaging: the carrier phase of each path
@@ -269,32 +281,6 @@ if nFrames > 0
     muAmp(nPerPoint == 0) = NaN;
     sdAmp(nPerPoint <  2) = NaN;
 
-    % --- Panel 2: mean vs excess path length ---
-    v = ~isnan(muAmp);
-    if SHOW_STD_BAND && any(~isnan(sdAmp))
-        vb = v & ~isnan(sdAmp);
-        fill(ax2, [excessG(vb); flipud(excessG(vb))], ...
-                  [muAmp(vb)+sdAmp(vb); flipud(max(muAmp(vb)-sdAmp(vb),0))], ...
-             [0.2 0.4 0.8], 'FaceAlpha',0.18, 'EdgeColor','none', ...
-             'DisplayName','\pm1 SD');
-    end
-    plot(ax2, excessG(v), muAmp(v), 'b-', 'LineWidth', 1.6, ...
-        'DisplayName', sprintf('Mean of %d frames', nFrames));
-    legend(ax2, 'Location','northeast');
-
-    % --- Panel 3: mean vs reflector offset ---
-    v3 = v & ~isnan(bG);
-    if SHOW_STD_BAND && any(~isnan(sdAmp))
-        v3b = v3 & ~isnan(sdAmp);
-        fill(ax3, [bG(v3b); flipud(bG(v3b))], ...
-                  [muAmp(v3b)+sdAmp(v3b); flipud(max(muAmp(v3b)-sdAmp(v3b),0))], ...
-             [0.2 0.4 0.8], 'FaceAlpha',0.18, 'EdgeColor','none', ...
-             'DisplayName','\pm1 SD');
-    end
-    plot(ax3, bG(v3), muAmp(v3), 'b-', 'LineWidth', 1.6, ...
-        'DisplayName', sprintf('Mean of %d frames', nFrames));
-    legend(ax3, 'Location','northeast');
-
     % --- Save the averaged trace alongside the per-frame aligned files ---
     meanT = table(gTaps, excessG, bG, muAmp, sdAmp, nPerPoint, ...
         'VariableNames', {'taps_from_fp','excess_path_m','reflector_off_m', ...
@@ -304,24 +290,29 @@ if nFrames > 0
         fullfile(ALIGNED_SUBDIR, 'cir_mean.csv'), height(meanT), nFrames);
 end
 
-xlabel(ax1, 'Accumulator index (tap)');
-ylabel(ax1, 'Amplitude  |I+jQ|');
-title(ax1, 'DW1000 CIR - absolute accumulator index (all frames)');
-xlim(ax1, [PLOT_TAP_MIN PLOT_TAP_MAX]);
-
-xlabel(ax2, 'Excess path length relative to first path (m)');
-ylabel(ax2, 'Amplitude / RXPACC');
-title(ax2, sprintf('DW1000 CIR - aligned on LDE first path (mean of %d frames)', nFrames));
-xlim(ax2, [-TAPS_BEFORE_FP TAPS_AFTER_FP] * TAP_TO_METRES);
-xline(ax2, 0, 'k--', 'first path', ...
-    'LabelOrientation','horizontal', 'LabelVerticalAlignment','top', ...
-    'HandleVisibility','off');
-
-xlabel(ax3, 'Reflector offset from tag-anchor midline (m)');
-ylabel(ax3, 'Amplitude / RXPACC');
-title(ax3, sprintf(['DW1000 CIR - ellipse geometry, D = %.2f m ' ...
-    '(mean of %d frames)'], D, nFrames));
-xlim(ax3, [0 sqrt(((TAPS_AFTER_FP*TAP_TO_METRES + D)/2)^2 - c^2)]);
+% =========================================================================
+%  FIGURE - Qorvo APS006 Part 3, Figure 1
+% =========================================================================
+% One frame's CIR on the absolute accumulator axis, with the LDE's own
+% reported diagnostics drawn on top:
+%   Rep:Fp          red vertical line at FP_INDEX
+%   Rep:Peak        black diamond at LDE_PPINDX
+%   Rep: Noise Level  cyan horizontal line at STD_NOISE x NTM
+if isnan(plotFrame.n)
+    warning('No complete frame available to plot.');
+    fig = figure('Color','w');
+else
+    if ~isfield(plotFrame.meta, 'STD_NOISE')
+        fprintf(['No STD_NOISE in this capture - the noise level line will ' ...
+                 'be omitted.\nReflash the anchor with the updated ' ...
+                 'ESP32_UWB_NLOS_anchor.ino to record it.\n']);
+    end
+    fig = plot_cir_aps006(plotFrame.sample, plotFrame.amp, plotFrame.meta, ...
+        struct('anchorId', ANCHOR_ID, 'blink', plotFrame.n, ...
+               'tapMin', PLOT_TAP_MIN, 'tapMax', PLOT_TAP_MAX));
+    fprintf('Plotted frame %d (%d samples)\n', ...
+        plotFrame.n, numel(plotFrame.sample));
+end
 
 % ---- Per-frame metadata summary -----------------------------------------
 % Stays at the top level of the capture folder because it describes both
@@ -345,7 +336,8 @@ if ~isempty(metaRows)
     fpMin = min(metaTable.FP_INDEX);
     fpMax = max(metaTable.FP_INDEX);
     fprintf("FP_INDEX range this capture: %.2f to %.2f\n", fpMin, fpMax);
-    if fpMax + TAPS_AFTER_FP < PLOT_TAP_MIN || fpMin - TAPS_BEFORE_FP > PLOT_TAP_MAX
+    if ~isempty(PLOT_TAP_MIN) && ~isempty(PLOT_TAP_MAX) && ...
+       (fpMax + TAPS_AFTER_FP < PLOT_TAP_MIN || fpMin - TAPS_BEFORE_FP > PLOT_TAP_MAX)
         warning(['The captured taps fall outside [%d %d]. Check that ' ...
                  'CIR_BEFORE_FP/CIR_AFTER_FP in the sketch match this script.'], ...
                  PLOT_TAP_MIN, PLOT_TAP_MAX);
@@ -360,7 +352,7 @@ else
     warning('No complete frames were captured - only the empty figure was saved.');
 end
 
-saveas(fig, fullfile(outDir, 'cir_plot.png'));
+exportgraphics(fig, fullfile(outDir, 'cir_plot.png'), 'Resolution', 200);
 savefig(fig, fullfile(outDir, 'cir_plot.fig'));
 
 fprintf("Done. All output written to %s\n", outDir);

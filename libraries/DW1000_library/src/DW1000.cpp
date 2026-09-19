@@ -1546,6 +1546,47 @@ float DW1000Class::getStdNoise() {
     return (float)noise;
 }
 
+/**
+ * NTM, the noise threshold multiplier, from bits 0-4 of LDE_CFG1
+ * (register 0x2E sub-address 0x0806). setDefaults() writes 0xD here, but
+ * read it back rather than assume, so a re-tuned receiver still reports the
+ * threshold it is actually using.
+ */
+uint8_t DW1000Class::getNoiseThresholdMultiplier() {
+	byte ldecfg1[LEN_LDE_CFG1];
+	readBytes(LDE_IF, LDE_CFG1_SUB, ldecfg1, LEN_LDE_CFG1);
+	return (uint8_t)(ldecfg1[0] & LDE_NTM_MASK);
+}
+
+/**
+ * The noise threshold drawn as "Rep: Noise Level" in APS006 Figure 1.
+ * Table 1 of that note defines it as STD_NOISE x NTM, in the same raw
+ * accumulator magnitude units as |I+jQ| from the CIR, so it can be plotted
+ * directly on top of the CIR.
+ */
+float DW1000Class::getNoiseThreshold() {
+	return getStdNoise() * (float)getNoiseThresholdMultiplier();
+}
+
+/**
+ * Index of the peak path reported by the LDE, "Rep: Peak" in APS006
+ * Figure 1. LDE_PPINDX (0x2E:0x1000) is an accumulator sample index.
+ */
+uint16_t DW1000Class::getPeakPathIndex() {
+	byte ppIndex[LEN_LDE_PPINDX];
+	readBytes(LDE_IF, LDE_PPINDX_SUB, ppIndex, LEN_LDE_PPINDX);
+	return (uint16_t)ppIndex[0] | ((uint16_t)ppIndex[1] << 8);
+}
+
+/**
+ * Amplitude of the peak path, LDE_PPAMPL (0x2E:0x1002).
+ */
+uint16_t DW1000Class::getPeakPathAmplitude() {
+	byte ppAmpl[LEN_LDE_PPAMPL];
+	readBytes(LDE_IF, LDE_PPAMPL_SUB, ppAmpl, LEN_LDE_PPAMPL);
+	return (uint16_t)ppAmpl[0] | ((uint16_t)ppAmpl[1] << 8);
+}
+
 /* ##### CIR / accumulator ################################################## */
  
 /**

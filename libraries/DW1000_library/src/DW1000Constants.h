@@ -212,6 +212,18 @@
 #define LEN_LDE_REPC                2
 #define LEN_LDE_RXANTD              2
 
+// LDE reported peak path, used by the APS006 diagnostics plot.
+// LDE_PPINDX is the peak index within the accumulator, LDE_PPAMPL its
+// amplitude. Both are only valid after LDEDONE for the current frame.
+#define LDE_PPINDX_SUB              0x1000
+#define LDE_PPAMPL_SUB              0x1002
+#define LEN_LDE_PPINDX              2
+#define LEN_LDE_PPAMPL              2
+
+// NTM, the noise threshold multiplier, lives in bits 0-4 of LDE_CFG1.
+// APS006 Table 1: noise threshold = STD_NOISE x NTM.
+#define LDE_NTM_MASK                0x1F
+
 // TX_POWER (for re-tuning only)
 #define TX_POWER                    0x1E
 #define LEN_TX_POWER                4

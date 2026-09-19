@@ -6,8 +6,7 @@
 // Library: jremington / thotro arduino-dw1000 with the corrected readCIR().
 //
 // Output (CSV over serial, 921600 baud):
-//   # FRAME,<n>,RX_TS,<ticks>,FP_INDEX,<x.xx>,FP_INT,<i>,RXPACC,<n>,RXPWR,<dBm>,
-//     STD_NOISE,<n>,NTM,<n>,NOISE_THRESH,<n>,PEAK_IDX,<i>,PEAK_AMPL,<n>,START,<i>
+//   # FRAME,<n>,RX_TS,<ticks>,FP_INDEX,<x.xx>,FP_INT,<i>,RXPACC,<n>,RXPWR,<dBm>,START,<i>
 //   sample,real,imag,amplitude,amplitude_norm
 //   730,-412,183,450.83,0.7233
 //   ...
@@ -15,14 +14,6 @@
 //
 // The sample column is the ABSOLUTE accumulator index, so frames with
 // different FP_INDEX values can still be overlaid correctly.
-//
-// The three diagnostics added for the APS006 Figure 1 plot are:
-//   NOISE_THRESH  STD_NOISE x NTM, the "Rep: Noise Level" line. Same raw
-//                 accumulator units as the amplitude column, so it can be
-//                 drawn straight onto the CIR.
-//   PEAK_IDX      LDE_PPINDX, the reported peak path ("Rep: Peak").
-//   PEAK_AMPL     LDE_PPAMPL, that peak's amplitude.
-// See APS006 Part 3, Table 1.
 // ============================================================================
 
 #include <SPI.h>
@@ -124,15 +115,6 @@ void loop() {
     const uint16_t rxpacc = DW1000.getPreambleAccumulationCount();
     const float    rxPwr  = DW1000.getReceivePower();
 
-    // APS006 Part 3 diagnostics. The noise threshold is STD_NOISE x NTM and
-    // is in raw accumulator magnitude units, the same as the amplitude
-    // column below, so MATLAB can draw it directly onto the CIR.
-    const float    stdNoise    = DW1000.getStdNoise();
-    const uint8_t  ntm         = DW1000.getNoiseThresholdMultiplier();
-    const float    noiseThresh = stdNoise * (float)ntm;
-    const uint16_t peakIdx     = DW1000.getPeakPathIndex();
-    const uint16_t peakAmpl    = DW1000.getPeakPathAmplitude();
-
     uint16_t startIndex = 0;
     const int n = DW1000.readCIRAroundFirstPath(cirBuffer,
                                                 CIR_BEFORE_FP,
@@ -157,11 +139,6 @@ void loop() {
     Serial.print(F(",FP_INT,"));   Serial.print(fpInt);
     Serial.print(F(",RXPACC,"));   Serial.print(rxpacc);
     Serial.print(F(",RXPWR,"));    Serial.print(rxPwr, 2);
-    Serial.print(F(",STD_NOISE,")); Serial.print(stdNoise, 2);
-    Serial.print(F(",NTM,"));       Serial.print(ntm);
-    Serial.print(F(",NOISE_THRESH,")); Serial.print(noiseThresh, 2);
-    Serial.print(F(",PEAK_IDX,"));  Serial.print(peakIdx);
-    Serial.print(F(",PEAK_AMPL,")); Serial.print(peakAmpl);
     Serial.print(F(",START,"));    Serial.println(startIndex);
 
     Serial.println(F("sample,real,imag,amplitude,amplitude_norm"));

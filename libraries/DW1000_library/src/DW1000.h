@@ -278,6 +278,10 @@ public:
 	static float getFirstPathPower();
 	static float getReceiveQuality();
 	static float getStdNoise();
+	static uint8_t  getNoiseThresholdMultiplier();  // NTM, LDE_CFG1 bits 0-4
+	static float    getNoiseThreshold();            // STD_NOISE x NTM
+	static uint16_t getPeakPathIndex();             // LDE_PPINDX
+	static uint16_t getPeakPathAmplitude();         // LDE_PPAMPL
 	static int readCIR(CIRSample* samples, uint16_t startSample, uint16_t numSamples);
 	static int readCIRAroundFirstPath(CIRSample* samples,
 	                                  uint16_t   samplesBefore,
