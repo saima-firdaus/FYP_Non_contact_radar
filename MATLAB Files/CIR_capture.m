@@ -3,33 +3,48 @@
 % Live-captures DW1000 CIR frames from the ESP32 anchor over serial, parses
 % them, saves the data to CSV, and plots the channel impulse response.
 %
+% ONE RUN = ONE EXPERIMENT. Opening the serial port pulls DTR/RTS and resets
+% the ESP32, so its AGC and oscillator restart from scratch every time the
+% port is reopened. That restart moves the CIR by far more than a human body
+% does, which is why a "background" run and a "target present" run captured
+% as two separate script invocations cannot be subtracted from each other.
+% Instead this script captures both conditions inside a single continuous
+% session and labels them by elapsed time:
+%
+%   t = 0 .. WALK_PROMPT_AT_S                    background (empty scene)
+%   .. + WALK_DURATION_S                         break: walk to your mark
+%                                                (captured, but discarded)
+%   .. CAPTURE_SECONDS                           phase 2 (target present)
+%
+% The break is announced with a plain fprintf, never pause(), because the
+% board keeps streaming the whole time - blocking the read loop would let the
+% serial buffer overflow and drop frames.
+%
 % Every run creates its own output folder named Capture_yyyymmdd_HHMMSS so
-% that repeated captures never overwrite each other. Inside that folder the
-% data is split into two subdirectories:
+% that repeated captures never overwrite each other:
 %
 %   Capture_yyyymmdd_HHMMSS/
-%     01_raw_frames/            <- exactly what the serial monitor sent
-%       frame_0000.csv ...        one CSV per captured frame
 %     02_lde_aligned/           <- everything referenced to the LDE first path
 %       frame_0000_aligned.csv    one CSV per frame, on the FP-relative axis
-%       cir_mean.csv              the frame-averaged CIR plotted in panels 2/3
+%       cir_mean.csv              the frame-average over the whole session
 %     frame_metadata.csv        header values (RX_TS, FP_INDEX, ...) per frame
+%     session_info.csv          the phase timings this run actually used
 %     cir_plot.png              the figure below
 %     cir_plot.fig              editable MATLAB figure
 %
-% 01_raw_frames columns (untouched accumulator data):
-%   sample            absolute accumulator index
-%   real, imag        raw accumulator I/Q
-%   amplitude         |I+jQ|
+% 02_lde_aligned columns (accumulator samples, re-referenced to the first path):
+%   sample            absolute accumulator index (for traceability/debugging)
+%   taps_from_fp      sample - FP_INDEX, i.e. taps relative to the first path
+%   amplitude         |I+jQ|, raw accumulator magnitude
 %   amplitude_norm    amplitude / RXPACC
 %
-% 02_lde_aligned columns (same samples, re-referenced to the first path):
-%   sample            absolute accumulator index (traces back to the raw file)
-%   taps_from_fp      sample - FP_INDEX, i.e. taps relative to the first path
-%   excess_path_m     extra distance travelled vs the direct path
-%   reflector_off_m   perpendicular offset of the reflector from the midpoint
-%                     of the tag-anchor line (see ellipse geometry below)
-%   amplitude, amplitude_norm
+% This stage is deliberately on a raw tap axis only: no ranging, no distance
+% conversion, no reflector geometry. The question it answers is simply
+% "does a human put a detectable peak anywhere in the CIR".
+%
+% Split the session into its phases and compare them with
+% cir_phase_analysis.m; compare a trial against an empty-room control with
+% cir_compare_trial.m.
 %
 % Expects the header line emitted by the corrected anchor sketch:
 %   # FRAME,3,RX_TS,123456789,FP_INDEX,748.34,FP_INT,748,RXPACC,1024,RXPWR,-62.1,START,728
@@ -37,25 +52,43 @@
 %   ... rows ...
 %   # END
 %
-% Usage: set PORT and TAG_ANCHOR_DIST_M below, then run.
+% Usage: set PORT and RUN_LABEL below, then run.
 
 PORT             = "COM4";
 BAUD             = 921600;      % must match Serial.begin() in the sketch
-CAPTURE_SECONDS  = 10;
+CAPTURE_SECONDS  = 30;      % 10 s background + 10 s break + 10 s phase 2
 STARTUP_DELAY_S  = 5;          % time to let the anchor boot before listening
 OUTPUT_ROOT      = pwd;         % parent directory for the Capture_* folders
 
+% ---- Phases within this one session --------------------------------------
+% Background runs from t=0 to WALK_PROMPT_AT_S. The next WALK_DURATION_S
+% seconds are the break: those frames are still read and saved (the port is
+% never left undrained) but cir_phase_analysis.m throws them away, because
+% that is when you are walking through the scene. Phase 2 is everything after
+% the break, up to CAPTURE_SECONDS.
+%
+% Leave enough phase-2 time to be worth averaging: with the anchor blinking
+% at roughly 10 Hz, 10 s is ~100 frames, though the true count always varies.
+WALK_PROMPT_AT_S = 10;          % background ends here
+WALK_DURATION_S  = 10;          % break length; walk to your mark in this window
+
+% ---- Bookkeeping ---------------------------------------------------------
+% Free-text label for this run. It changes nothing about the capture, it just
+% lands in session_info.csv so a folder full of timestamps is still readable
+% six weeks later. Examples: "trial1_human_2m_los", "control_empty".
+%RUN_LABEL        = "trial1_human_2m_los";
+RUN_LABEL        = "control_empty";
+
 % ---- Subdirectory names --------------------------------------------------
-% Change these if you prefer different labels. The numeric prefixes just keep
-% them in a sensible order in the file browser.
-RAW_SUBDIR       = '01_raw_frames';
+% Change these if you prefer different labels. The numeric prefix just keeps
+% it in a sensible order in the file browser.
 ALIGNED_SUBDIR   = '02_lde_aligned';
 
 % ---- Geometry ------------------------------------------------------------
-% Straight-line distance between the tag and the anchor, in metres. MEASURE
-% THIS for every capture - the reflector-offset conversion below is wrong if
-% it is wrong, and it is recorded in frame_metadata.csv for traceability.
-TAG_ANCHOR_DIST_M = 0.3;
+% Straight-line distance between the tag and the anchor, in metres. Recorded
+% in frame_metadata.csv for traceability only - nothing in this pipeline
+% computes from it any more, since this stage stays on the raw tap axis.
+TAG_ANCHOR_DIST_M = 1.5;
 
 % ---- Plot ----------------------------------------------------------------
 % The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
@@ -67,7 +100,7 @@ TAG_ANCHOR_DIST_M = 0.3;
 % That is what the application note plots, it puts the y-axis on the same
 % x10^4 scale, and it is the only scale on which STD_NOISE x NTM is a
 % meaningful threshold.
-ANCHOR_ID        = 5;           % for the title, e.g. "Anchor 5  Blink 215"
+ANCHOR_ID        = 1;           % for the title, e.g. "Anchor 5  Blink 215"
 PLOT_FRAME       = [];          % frame number to plot; [] = the first one
 
 % Absolute accumulator taps to display. Empty auto-fits to the captured
@@ -89,6 +122,15 @@ TAP_TO_METRES    = 0.30028;
 % of taps-relative-to-FP before averaging.
 MEAN_GRID_STEP   = 0.5;         % taps
 
+% A break that starts after the capture has already ended, or one that eats
+% the whole session, leaves phase 2 empty and the run is wasted. Catch it now
+% rather than after standing in a room for half a minute.
+if WALK_PROMPT_AT_S + WALK_DURATION_S >= CAPTURE_SECONDS
+    error(['No time left for phase 2: WALK_PROMPT_AT_S (%g) + ' ...
+           'WALK_DURATION_S (%g) must be less than CAPTURE_SECONDS (%g).'], ...
+           WALK_PROMPT_AT_S, WALK_DURATION_S, CAPTURE_SECONDS);
+end
+
 % NOTE: the original script called delay(30000), which is an Arduino
 % function, not a MATLAB one. pause() takes seconds.
 if STARTUP_DELAY_S > 0
@@ -99,17 +141,33 @@ end
 % ---- Output folders for this run ----------------------------------------
 runStamp   = datestr(now, 'yyyymmdd_HHMMSS');   %#ok<TNOW1,DATST>
 outDir     = fullfile(OUTPUT_ROOT, ['Capture_' runStamp]);
-rawDir     = fullfile(outDir, RAW_SUBDIR);
 alignedDir = fullfile(outDir, ALIGNED_SUBDIR);
 
-for d = {outDir, rawDir, alignedDir}
+for d = {outDir, alignedDir}
     if ~exist(d{1}, 'dir')
         mkdir(d{1});
     end
 end
 fprintf("Saving this capture to %s\n", outDir);
-fprintf("  raw serial frames  -> %s\n", RAW_SUBDIR);
 fprintf("  LDE-aligned data   -> %s\n", ALIGNED_SUBDIR);
+fprintf("  run label          -> %s\n", RUN_LABEL);
+
+% ---- Session description -------------------------------------------------
+% Written before the port is even opened, so that a run interrupted halfway
+% still leaves behind the phase boundaries its frames were timed against.
+% cir_phase_analysis.m reads this instead of asking you to retype the
+% timings, which is the only way the two can never disagree.
+sessionT = table( ...
+    string(RUN_LABEL), string(runStamp), CAPTURE_SECONDS, WALK_PROMPT_AT_S, ...
+    WALK_DURATION_S, TAPS_BEFORE_FP, TAPS_AFTER_FP, MEAN_GRID_STEP, ...
+    TAP_TO_METRES, string(PORT), BAUD, string(ALIGNED_SUBDIR), ...
+    'VariableNames', {'run_label','run_stamp','capture_seconds', ...
+        'walk_prompt_at_s','walk_duration_s','taps_before_fp','taps_after_fp', ...
+        'mean_grid_step','tap_to_metres','port','baud','aligned_subdir'});
+writetable(sessionT, fullfile(outDir, 'session_info.csv'));
+fprintf("  phases             -> background 0-%gs | break %g-%gs | phase2 %g-%gs\n", ...
+    WALK_PROMPT_AT_S, WALK_PROMPT_AT_S, WALK_PROMPT_AT_S + WALK_DURATION_S, ...
+    WALK_PROMPT_AT_S + WALK_DURATION_S, CAPTURE_SECONDS);
 
 % ---- Serial capture ------------------------------------------------------
 s = serialport(PORT, BAUD);
@@ -125,8 +183,32 @@ complete = containers.Map('KeyType','double','ValueType','any');
 currentFrame = NaN;
 nRejected    = 0;
 
+walkAnnounced   = false;
+phase2Announced = false;
+breakEndsAt     = WALK_PROMPT_AT_S + WALK_DURATION_S;
+
 tStart = tic;
-while toc(tStart) < CAPTURE_SECONDS
+while true
+    elapsed = toc(tStart);
+    if elapsed >= CAPTURE_SECONDS, break; end
+
+    % ---- Phase cues -----------------------------------------------------
+    % Printed, never paused. These sit above the NumBytesAvailable check so
+    % that a quiet moment on the port cannot swallow the cue, and the loop
+    % carries straight on into readline() either way - the board is still
+    % streaming while you walk, and those frames still get saved.
+    if ~walkAnnounced && elapsed >= WALK_PROMPT_AT_S
+        fprintf("\n>>> Walk to your position now, stand still by t=%gs.\n", ...
+            breakEndsAt);
+        fprintf(">>> (frames from %gs to %gs are captured but discarded)\n\n", ...
+            WALK_PROMPT_AT_S, breakEndsAt);
+        walkAnnounced = true;
+    end
+    if ~phase2Announced && elapsed >= breakEndsAt
+        fprintf("\n>>> PHASE 2 - hold still until t=%gs.\n\n", CAPTURE_SECONDS);
+        phase2Announced = true;
+    end
+
     if s.NumBytesAvailable == 0, continue; end
     line = strtrim(readline(s));
     if line == "", continue; end
@@ -139,6 +221,9 @@ while toc(tStart) < CAPTURE_SECONDS
             key = strtrim(erase(parts(k), "#"));
             kv.(matlab.lang.makeValidName(key)) = str2double(parts(k+1));
         end
+        % Host-side arrival time, which is what the phases are defined
+        % against. The ESP32 knows nothing about it and needs no change.
+        kv.elapsed_s = toc(tStart);
         currentFrame = kv.FRAME;
         frames(currentFrame)   = zeros(0,5);
         meta(currentFrame)     = kv;
@@ -183,19 +268,10 @@ if nRejected > 0
 end
 
 % ---- Save + plot ---------------------------------------------------------
-fig = figure('Color','w','Position',[100 60 900 950]);
-tiledlayout(3,1);
-
-ax1 = nexttile; hold(ax1,'on'); grid(ax1,'on');   % absolute tap, every frame
-ax2 = nexttile; hold(ax2,'on'); grid(ax2,'on');   % excess path length, mean
-ax3 = nexttile; hold(ax3,'on'); grid(ax3,'on');   % reflector offset, mean
-
 ks = sort(cell2mat(frames.keys));
 plotFrame = struct('n', NaN, 'sample', [], 'amp', []);
 metaRows    = {};
 nIncomplete = 0;
-D           = TAG_ANCHOR_DIST_M;
-c           = D / 2;                              % half the focal separation
 
 % Common delay grid for averaging, in taps relative to the first path.
 gTaps   = (-TAPS_BEFORE_FP : MEAN_GRID_STEP : TAPS_AFTER_FP)';
@@ -214,42 +290,28 @@ for k = ks
     m    = meta(k);
     data = sortrows(data, 1);
 
-    % ---- Save the untouched frame into the raw subdirectory --------------
-    rawT = array2table(data, 'VariableNames', ...
-        {'sample','real','imag','amplitude','amplitude_norm'});
-    rawName = sprintf('frame_%04d.csv', k);
-    writetable(rawT, fullfile(rawDir, rawName));
-
-    % ---- Excess path length, referenced to the LDE first path ------------
+    % ---- Align on the LDE first path -------------------------------------
+    % FP_INDEX is fractional and moves frame to frame, so the absolute
+    % accumulator index is not a common axis. Subtracting it is what makes
+    % frames addable; it is not a distance conversion, and nothing further
+    % is derived from it at this stage.
     tapsFromFP = data(:,1) - m.FP_INDEX;
-    excess     = tapsFromFP * TAP_TO_METRES;      % tau, metres
-
-    % ---- Ellipse geometry: excess delay -> reflector offset --------------
-    % A multipath component arriving tau later than the direct path travelled
-    % tag -> reflector -> anchor = D + tau in total. Every point with that
-    % total path length lies on an ellipse whose foci are the tag and the
-    % anchor, with semi-major axis a = (D + tau)/2. The semi-minor axis
-    %   b = sqrt(a^2 - (D/2)^2)
-    % is the perpendicular distance from the midpoint of the tag-anchor line
-    % out to that ellipse.
-    a = (excess + D) / 2;
-    b = sqrt(max(a.^2 - c^2, 0));
-    b(excess < 0) = NaN;                          % pre-arrival noise
 
     % ---- Save the aligned frame into the aligned subdirectory ------------
-    alignedT = table(data(:,1), tapsFromFP, excess, b, data(:,4), data(:,5), ...
-        'VariableNames', {'sample','taps_from_fp','excess_path_m', ...
-                          'reflector_off_m','amplitude','amplitude_norm'});
+    % sample is kept purely for traceability: with no raw file written any
+    % more, it is the only way back to the accumulator index when a frame
+    % looks wrong.
+    alignedT = table(data(:,1), tapsFromFP, data(:,4), data(:,5), ...
+        'VariableNames', {'sample','taps_from_fp','amplitude','amplitude_norm'});
     alignedName = sprintf('frame_%04d_aligned.csv', k);
     writetable(alignedT, fullfile(alignedDir, alignedName));
 
-    fprintf("Saved %s + %s (%d samples, FP_INDEX=%.2f, RXPACC=%d, RXPWR=%.1f dBm)\n", ...
-        rawName, alignedName, height(rawT), m.FP_INDEX, m.RXPACC, m.RXPWR);
+    fprintf("Saved %s (%d samples, t=%.1fs, FP_INDEX=%.2f, RXPACC=%d, RXPWR=%.1f dBm)\n", ...
+        alignedName, height(alignedT), m.elapsed_s, m.FP_INDEX, m.RXPACC, m.RXPWR);
 
     mr = m;
-    mr.tag_anchor_dist_m = D;
-    mr.n_samples   = height(rawT);
-    mr.raw_csv     = string(fullfile(RAW_SUBDIR, rawName));
+    mr.tag_anchor_dist_m = TAG_ANCHOR_DIST_M;
+    mr.n_samples   = height(alignedT);
     mr.aligned_csv = string(fullfile(ALIGNED_SUBDIR, alignedName));
     metaRows{end+1} = mr; %#ok<SAGROW>
 
@@ -275,11 +337,10 @@ if nIncomplete > 0
 end
 
 % ---- Frame average -------------------------------------------------------
-nFrames   = size(ampGrid, 2);
-excessG   = gTaps * TAP_TO_METRES;
-aG        = (excessG + D) / 2;
-bG        = sqrt(max(aG.^2 - c^2, 0));
-bG(excessG < 0) = NaN;
+% Whole-session average, phases and all. It is a sanity check on the capture,
+% not the experiment: the background/phase-2 split that actually answers the
+% question is done by cir_phase_analysis.m.
+nFrames = size(ampGrid, 2);
 
 if nFrames > 0
     nPerPoint = sum(~isnan(ampGrid), 2);
@@ -289,8 +350,8 @@ if nFrames > 0
     sdAmp(nPerPoint <  2) = NaN;
 
     % --- Save the averaged trace alongside the per-frame aligned files ---
-    meanT = table(gTaps, excessG, bG, muAmp, sdAmp, nPerPoint, ...
-        'VariableNames', {'taps_from_fp','excess_path_m','reflector_off_m', ...
+    meanT = table(gTaps, muAmp, sdAmp, nPerPoint, ...
+        'VariableNames', {'taps_from_fp', ...
                           'amplitude_norm_mean','amplitude_norm_sd','n_frames'});
     writetable(meanT, fullfile(alignedDir, 'cir_mean.csv'));
     fprintf("Saved %s (%d grid points, %d frames averaged)\n", ...
@@ -322,8 +383,9 @@ else
 end
 
 % ---- Per-frame metadata summary -----------------------------------------
-% Stays at the top level of the capture folder because it describes both
-% subdirectories, and points at the matching file in each.
+% Stays at the top level of the capture folder because it describes the whole
+% run, and points at the aligned file for each frame. The elapsed_s column
+% added at header-parse time is what cir_phase_analysis.m splits on.
 if ~isempty(metaRows)
     allFields = {};
     for i = 1:numel(metaRows)
@@ -350,11 +412,19 @@ if ~isempty(metaRows)
                  PLOT_TAP_MIN, PLOT_TAP_MAX);
     end
 
-    % One tap of delay maps to a large offset near tau = 0 and a shrinking
-    % one further out, so quote the resolution at the first tap.
-    tau1 = TAP_TO_METRES;
-    fprintf("One tap (%.3f m excess) = %.3f m reflector offset at tau=0.\n", ...
-        tau1, sqrt(((tau1 + D)/2)^2 - c^2));
+    % ---- How the frames actually fell across the phases ------------------
+    % Never assume a fixed count: the blink rate wanders and truncated frames
+    % are dropped, so both windows end up with whatever they end up with.
+    el    = metaTable.elapsed_s;
+    nBg   = sum(el <  WALK_PROMPT_AT_S);
+    nWalk = sum(el >= WALK_PROMPT_AT_S & el < WALK_PROMPT_AT_S + WALK_DURATION_S);
+    nP2   = sum(el >= WALK_PROMPT_AT_S + WALK_DURATION_S);
+    fprintf("Frames per phase: background %d | break %d (discarded) | phase2 %d\n", ...
+        nBg, nWalk, nP2);
+    if nBg == 0 || nP2 == 0
+        warning(['One of the phases captured no frames - this run cannot be ' ...
+                 'differenced. Check the anchor was blinking throughout.']);
+    end
 else
     warning('No complete frames were captured - only the empty figure was saved.');
 end
@@ -363,3 +433,4 @@ exportgraphics(fig, fullfile(outDir, 'cir_plot.png'), 'Resolution', 200);
 savefig(fig, fullfile(outDir, 'cir_plot.fig'));
 
 fprintf("Done. All output written to %s\n", outDir);
+fprintf("Next: cir_phase_analysis('%s')\n", outDir);

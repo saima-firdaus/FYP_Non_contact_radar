@@ -1,0 +1,2 @@
+run_label,run_stamp,capture_seconds,walk_prompt_at_s,walk_duration_s,taps_before_fp,taps_after_fp,mean_grid_step,tap_to_metres,port,baud,aligned_subdir
+control_empty,20260920_162429,30,10,10,50,100,0.5,0.30028,COM4,921600,02_lde_aligned

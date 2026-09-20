@@ -1,0 +1,2 @@
+trial_dir,control_dir,run_label,trial_peak_tap,trial_peak_mag,trial_peak_signed,control_peak_tap,control_peak_mag,ratio,detected,exclude_margin,detection_factor,n_background,n_phase2
+C:\Users\dattp\OneDrive\Documents\Arduino\FYP_Non_contact_radar\MATLAB Files\Capture_20260920_162429,C:\Users\dattp\OneDrive\Documents\Arduino\FYP_Non_contact_radar\MATLAB Files\Capture_20260920_162833,control_empty,23,8.42214970024271,-8.42214970024271,27.5,1.10503750893578,7.62159621925754,1,3,3,96,98
