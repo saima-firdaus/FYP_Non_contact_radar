@@ -233,6 +233,7 @@ ph.sd      = sd;
 ph.nPer    = nPer;
 ph.nFrames = nUsed;
 ph.noise   = local_phase_noise(Mp);
+ph.rxpwr   = local_phase_rxpwr(Mp);
 
 if verbose
     kept = ~isnan(mu);
@@ -272,6 +273,21 @@ ok  = isfinite(thr) & isfinite(acc) & acc > 0 & thr > 0;
 if any(ok)
     lvl = mean(thr(ok) ./ acc(ok));
 end
+end
+
+% =========================================================================
+function p = local_phase_rxpwr(Mp)
+%LOCAL_PHASE_RXPWR  Mean RXPWR over a phase's frames, in dBm, or NaN.
+%
+% Averaged in dBm as reported rather than converted to linear power first.
+% This is a label on a figure, not a radiometric quantity - what it is for is
+% spotting that the receive power sat in a different place in phase 2 than it
+% did in the background, which is drift showing itself.
+p = NaN;
+if ~ismember('RXPWR', Mp.Properties.VariableNames), return; end
+v = Mp.RXPWR;
+v = v(isfinite(v));
+if ~isempty(v), p = mean(v); end
 end
 
 % =========================================================================
@@ -350,7 +366,12 @@ end
 
 % =========================================================================
 function fig = local_plot(R, showSD)
-%LOCAL_PLOT  Background / phase 2 / difference, in APS006 visual language.
+%LOCAL_PLOT  Background / phase 2 / difference, drawn like APS006 Figure 1.
+%
+% Same instrument as plot_cir_aps006.m: blue asterisk-marked trace, red
+% first-path line, filled black diamond on the peak, cyan noise level,
+% dashed black grid. Every value comes from aps006_style so the single-frame
+% figure and these three panels cannot drift apart.
 st  = aps006_style();
 fig = figure('Color', st.figureColour, 'Position', [80 40 950 940]);
 tl  = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -361,7 +382,8 @@ if strlength(R.session.run_label) > 0
 end
 % Interpreter none: run labels are full of underscores, and TeX would turn
 % trial1_human_2m_los into subscripts.
-title(tl, ttl, 'FontWeight', 'bold', 'Interpreter', 'none');
+title(tl, ttl, 'FontSize', st.labelFontSize + 1, 'FontWeight', 'bold', ...
+    'Interpreter', 'none');
 
 axList = gobjects(3,1);
 
@@ -370,7 +392,7 @@ axList = gobjects(3,1);
 % background panel stretched to its own noise would read as the louder scene.
 % The noise line is drawn after these limits are fixed, so a threshold far
 % off the trace clips instead of flattening the CIR against the axis.
-yr = local_y_range({R.background, R.phase2}, showSD);
+yr = local_y_range({R.background, R.phase2}, showSD, st);
 
 axList(1) = local_phase_panel(tl, R.gTaps, R.background, st, showSD, yr, ...
     sprintf('Background (n = %d frames)', R.background.nFrames));
@@ -378,19 +400,42 @@ axList(2) = local_phase_panel(tl, R.gTaps, R.phase2, st, showSD, yr, ...
     sprintf('Phase 2, target present (n = %d frames)', R.phase2.nFrames));
 
 % ---- Difference ----------------------------------------------------------
-ax = nexttile(tl); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
-set(ax, 'FontSize', st.fontSize);
-yline(ax, 0, '-', 'Color', st.zeroColour, 'LineWidth', st.zeroWidth);
-h = plot(ax, R.gTaps, R.diff, '-', 'Color', st.diffColour, ...
-    'LineWidth', st.diffWidth);
-hFp = xline(ax, 0, '-', st.fpLabel, 'Color', st.fpColour, ...
-    'LineWidth', st.fpWidth, 'LabelVerticalAlignment', 'top', ...
-    'LabelHorizontalAlignment', 'left', 'FontSize', st.fontSize);
-xlabel(ax, st.xLabelFP);
-ylabel(ax, '\Delta Amplitude / RXPACC');
-title(ax, 'Difference (Phase 2 - Background)');
-legend(ax, [h hFp], {'Phase 2 - Background', 'aligned first path'}, ...
-    'Location', 'northeast', 'FontSize', st.fontSize);
+ax = nexttile(tl); hold(ax,'on');
+plot(ax, [min(R.gTaps) max(R.gTaps)], [0 0], '-', ...
+    'Color', st.zeroColour, 'LineWidth', st.zeroWidth);
+% cirWidth, not diffWidth: an asterisk drawn with a heavier stroke fills in
+% and reads as a dot, which would make this panel's marker look like a
+% different symbol from the two above it.
+hD = plot(ax, R.gTaps, R.diff, '-', 'Color', st.diffColour, ...
+    'LineWidth', st.cirWidth, 'Marker', st.cirMarker, ...
+    'MarkerSize', st.cirMarkerSize, ...
+    'MarkerIndices', local_marker_indices(R.gTaps), ...
+    'DisplayName', 'Phase 2 - Background');
+
+dr = local_pad_range(R.diff, st);
+hF = plot(ax, [0 0], dr, '-', 'Color', st.fpColour, ...
+    'LineWidth', st.fpWidth, 'DisplayName', st.fpLabel);
+
+% The largest excursion either way. Same filled diamond as Rep:Peak, because
+% it plays the same role: this is the tap the eye should go to.
+hP = gobjects(0);
+[~, j] = max(abs(R.diff));
+if isfinite(R.diff(j))
+    hP = plot(ax, R.gTaps(j), R.diff(j), st.peakMarker, ...
+        'Color', st.peakColour, 'MarkerFaceColor', st.peakFace, ...
+        'MarkerSize', st.peakSize, ...
+        'DisplayName', sprintf('Peak @ %+g', R.gTaps(j)));
+end
+
+local_style_axes(ax, st);
+xlim(ax, [min(R.gTaps) max(R.gTaps)]);
+ylim(ax, dr);
+xlabel(ax, st.xLabelFP, 'FontSize', st.labelFontSize);
+ylabel(ax, ['\Delta ' st.yLabelNorm], 'FontSize', st.labelFontSize);
+title(ax, 'Difference (Phase 2 - Background)', ...
+    'FontSize', st.labelFontSize, 'FontWeight', 'normal');
+legend(ax, [hD hF hP], 'Location', 'northeast', ...
+    'FontSize', st.legendSize, 'Box', 'on', 'EdgeColor', [0 0 0]);
 axList(3) = ax;
 
 linkaxes(axList, 'x');
@@ -398,7 +443,111 @@ xlim(axList(1), [min(R.gTaps) max(R.gTaps)]);
 end
 
 % =========================================================================
-function yr = local_y_range(phases, showSD)
+function ax = local_phase_panel(tl, gTaps, ph, st, showSD, yr, titleStr)
+%LOCAL_PHASE_PANEL  One averaged phase, drawn like the single-frame figure.
+%
+% The first path sits at taps_from_fp = 0 by construction, since every frame
+% was aligned onto it before averaging, so the red line goes there rather
+% than at FP_INDEX. The diamond marks the peak of the averaged trace; it is
+% deliberately labelled "Peak" and not "Rep:Peak", because the chip reports
+% Rep:Peak for one frame and never reported this.
+ax = nexttile(tl); hold(ax,'on');
+
+hSD = gobjects(0);
+if showSD
+    ok = ~isnan(ph.mu) & ~isnan(ph.sd);
+    if any(ok)
+        xs  = gTaps(ok);
+        lo  = ph.mu(ok) - ph.sd(ok);
+        hi  = ph.mu(ok) + ph.sd(ok);
+        hSD = fill(ax, [xs; flipud(xs)], [lo; flipud(hi)], st.sdFaceColour, ...
+            'FaceAlpha', st.sdFaceAlpha, 'EdgeColor', 'none', ...
+            'DisplayName', '\pm1 SD across frames');
+    end
+end
+
+hC = plot(ax, gTaps, ph.mu, '-', 'Color', st.cirColour, ...
+    'LineWidth', st.cirWidth, 'Marker', st.cirMarker, ...
+    'MarkerSize', st.cirMarkerSize, ...
+    'MarkerIndices', local_marker_indices(gTaps), ...
+    'DisplayName', 'Mean CIR');
+
+hF = plot(ax, [0 0], yr, '-', 'Color', st.fpColour, ...
+    'LineWidth', st.fpWidth, 'DisplayName', st.fpLabel);
+
+hP = gobjects(0);
+[~, j] = max(ph.mu);
+if ~isempty(j) && isfinite(ph.mu(j))
+    hP = plot(ax, gTaps(j), ph.mu(j), st.peakMarker, ...
+        'Color', st.peakColour, 'MarkerFaceColor', st.peakFace, ...
+        'MarkerSize', st.peakSize, ...
+        'DisplayName', sprintf('Peak @ %+g', gTaps(j)));
+end
+
+hN = gobjects(0);
+if ~isnan(ph.noise)
+    if ph.noise < yr(1) || ph.noise > yr(2)
+        % Say so rather than let it look absent: a threshold off the top of
+        % the panel means the averaged CIR never cleared it.
+        nLabel = sprintf('%s (off scale, %.4g)', st.noiseLabel, ph.noise);
+    else
+        nLabel = st.noiseLabel;
+    end
+    hN = plot(ax, [min(gTaps) max(gTaps)], [ph.noise ph.noise], '-', ...
+        'Color', st.noiseColour, 'LineWidth', st.noiseWidth, ...
+        'DisplayName', nLabel);
+end
+
+local_style_axes(ax, st);
+xlim(ax, [min(gTaps) max(gTaps)]);
+ylim(ax, yr);   % fixed before anything else can rescale it
+ylabel(ax, st.yLabelNorm, 'FontSize', st.labelFontSize);
+title(ax, titleStr, 'FontSize', st.labelFontSize, 'FontWeight', 'normal');
+
+if ~isnan(ph.rxpwr)
+    subtitle(ax, sprintf('RXPWR %.1f dBm (mean)', ph.rxpwr), ...
+        'FontSize', st.fontSize, ...
+        'FontWeight', 'normal');
+end
+
+legend(ax, [hC hF hP hN hSD], 'Location', 'northeast', ...
+    'FontSize', st.legendSize, 'Box', 'on', 'EdgeColor', [0 0 0]);
+end
+
+% =========================================================================
+function local_style_axes(ax, st)
+%LOCAL_STYLE_AXES  The application note's axes, straight out of the style.
+grid(ax, 'on');
+ax.GridLineStyle = st.gridStyle;
+ax.GridColor     = st.gridColour;
+ax.GridAlpha     = st.gridAlpha;
+ax.Layer         = 'bottom';
+ax.FontSize      = st.fontSize;
+ax.LineWidth     = st.axesWidth;
+ax.TickDir       = 'in';
+box(ax, 'on');
+end
+
+% =========================================================================
+function idx = local_marker_indices(gTaps)
+%LOCAL_MARKER_INDICES  One asterisk per tap, whatever the grid step is.
+%
+% plot_cir_aps006 puts a marker on every accumulator sample, i.e. one per
+% tap. The averaging grid is finer than that (MEAN_GRID_STEP is 0.5 taps by
+% default), so mark every Nth point instead of every one - otherwise the same
+% style comes out twice as dense here as on the single-frame figure.
+step = 1;
+if numel(gTaps) > 1
+    gridStep = median(diff(gTaps));
+    if gridStep > 0
+        step = max(1, round(1 / gridStep));
+    end
+end
+idx = 1:step:numel(gTaps);
+end
+
+% =========================================================================
+function yr = local_y_range(phases, showSD, st)
 %LOCAL_Y_RANGE  A single y-range covering every phase trace on the figure.
 lo = []; hi = [];
 for i = 1:numel(phases)
@@ -418,60 +567,17 @@ if isempty(lo)
     yr = [0 1];
     return
 end
-pad = 0.06 * max(hi - lo, eps);
-yr  = [lo - pad, hi + pad];
+% The note's axis starts at zero and leaves headroom above the peak; keep
+% that unless the SD band actually reaches below zero.
+yr = [min(0, lo), max(hi * st.headroom, eps)];
 end
 
 % =========================================================================
-function ax = local_phase_panel(tl, gTaps, ph, st, showSD, yr, titleStr)
-%LOCAL_PHASE_PANEL  One averaged phase, drawn like the single-frame figure.
-%
-% Same conventions as PLOT_CIR_APS006: red vertical "Rep:Fp" line and, where
-% the metadata supports one, the cyan noise level. The first path sits at
-% taps_from_fp = 0 by construction here, since every frame was aligned onto
-% it before averaging.
-ax = nexttile(tl); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
-set(ax, 'FontSize', st.fontSize);
-
-hLeg = gobjects(0); lLeg = {};
-
-if showSD
-    ok = ~isnan(ph.mu) & ~isnan(ph.sd);
-    if any(ok)
-        xs = gTaps(ok);
-        lo = ph.mu(ok) - ph.sd(ok);
-        hi = ph.mu(ok) + ph.sd(ok);
-        h  = fill(ax, [xs; flipud(xs)], [lo; flipud(hi)], st.sdFaceColour, ...
-            'FaceAlpha', st.sdFaceAlpha, 'EdgeColor', 'none');
-        hLeg(end+1) = h; lLeg{end+1} = '\pm1 SD across frames';
-    end
-end
-
-h = plot(ax, gTaps, ph.mu, '-', 'Color', st.cirColour, 'LineWidth', st.cirWidth);
-hLeg(end+1) = h; lLeg{end+1} = 'mean CIR';
-
-h = xline(ax, 0, '-', st.fpLabel, 'Color', st.fpColour, ...
-    'LineWidth', st.fpWidth, 'LabelVerticalAlignment', 'top', ...
-    'LabelHorizontalAlignment', 'left', 'FontSize', st.fontSize);
-hLeg(end+1) = h; lLeg{end+1} = 'aligned first path';
-
-ylim(ax, yr);   % fixed before the noise line, so the line cannot rescale it
-
-if ~isnan(ph.noise)
-    h = yline(ax, ph.noise, '-', st.noiseLabel, 'Color', st.noiseColour, ...
-        'LineWidth', st.noiseWidth, 'LabelHorizontalAlignment', 'right', ...
-        'LabelVerticalAlignment', 'bottom', 'FontSize', st.fontSize);
-    hLeg(end+1) = h;
-    if ph.noise < yr(1) || ph.noise > yr(2)
-        % Say so rather than let it look absent: a threshold off the top of
-        % the panel means the averaged CIR never cleared it.
-        lLeg{end+1} = sprintf('%s = %.4g (off scale)', st.noiseLabel, ph.noise);
-    else
-        lLeg{end+1} = sprintf('%s (mean)', st.noiseLabel);
-    end
-end
-
-ylabel(ax, st.yLabelNorm);
-title(ax, titleStr);
-legend(ax, hLeg, lLeg, 'Location', 'northeast', 'FontSize', st.fontSize);
+function r = local_pad_range(v, st)
+%LOCAL_PAD_RANGE  Symmetric-ish limits for a trace that can go negative.
+v = v(isfinite(v));
+if isempty(v), r = [-1 1]; return; end
+lo = min(v); hi = max(v);
+pad = (st.headroom - 1) * max(hi - lo, eps);
+r = [lo - pad, hi + pad];
 end
