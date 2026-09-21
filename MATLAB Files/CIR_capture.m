@@ -57,7 +57,7 @@
 PORT             = "COM4";
 BAUD             = 921600;      % must match Serial.begin() in the sketch
 CAPTURE_SECONDS  = 30;      % 10 s background + 10 s break + 10 s phase 2
-STARTUP_DELAY_S  = 5;          % time to let the anchor boot before listening
+STARTUP_DELAY_S  = 10;          % time to let the anchor boot before listening
 OUTPUT_ROOT      = pwd;         % parent directory for the Capture_* folders
 
 % ---- Phases within this one session --------------------------------------
@@ -77,7 +77,7 @@ WALK_DURATION_S  = 10;          % break length; walk to your mark in this window
 % lands in session_info.csv so a folder full of timestamps is still readable
 % six weeks later. Examples: "trial1_human_2m_los", "control_empty".
 %RUN_LABEL        = "trial1_human_2m_los";
-RUN_LABEL        = "control_empty";
+RUN_LABEL        = "ch5_sep1m_d3m";
 
 % ---- Subdirectory names --------------------------------------------------
 % Change these if you prefer different labels. The numeric prefix just keeps
@@ -88,7 +88,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. Recorded
 % in frame_metadata.csv for traceability only - nothing in this pipeline
 % computes from it any more, since this stage stays on the raw tap axis.
-TAG_ANCHOR_DIST_M = 1.5;
+TAG_ANCHOR_DIST_M = 1;
 
 % ---- Plot ----------------------------------------------------------------
 % The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
