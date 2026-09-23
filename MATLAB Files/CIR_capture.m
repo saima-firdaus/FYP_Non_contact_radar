@@ -77,7 +77,7 @@ WALK_DURATION_S  = 10;          % break length; walk to your mark in this window
 % lands in session_info.csv so a folder full of timestamps is still readable
 % six weeks later. Examples: "trial1_human_2m_los", "control_empty".
 %RUN_LABEL        = "trial1_human_2m_los";
-RUN_LABEL        = "ch5_sep1m_d3m";
+RUN_LABEL        = "ch5_sep1.5m_d2m";
 
 % ---- Subdirectory names --------------------------------------------------
 % Change these if you prefer different labels. The numeric prefix just keeps
