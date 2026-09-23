@@ -1,9 +1,9 @@
-function out = cir_phase_analysis(captureDir, varargin)
-%CIR_PHASE_ANALYSIS  Split one capture into background / phase 2 and difference them.
+function out = cir_phase_analysis2(captureDir, varargin)
+%CIR_PHASE_ANALYSIS2  Split one capture into background / phase 2 and difference them.
 %
-%   out = CIR_PHASE_ANALYSIS(captureDir)
-%   out = CIR_PHASE_ANALYSIS(captureDir, 'Name', value, ...)
-%   out = CIR_PHASE_ANALYSIS()            % newest Capture_* folder in pwd
+%   out = CIR_PHASE_ANALYSIS2(captureDir)
+%   out = CIR_PHASE_ANALYSIS2(captureDir, 'Name', value, ...)
+%   out = CIR_PHASE_ANALYSIS2()            % newest Capture_* folder in pwd
 %
 % CIR_capture.m records every frame's host-side arrival time as elapsed_s in
 % frame_metadata.csv, and the phase boundaries it used in session_info.csv.
@@ -155,8 +155,23 @@ dAmp = p2.mu - bg.mu;
 % has to be before it means anything. That estimate is taken BEFORE clipping
 % and drawn as the detection threshold, so removing the negatives does not
 % throw away the one thing they were telling you.
-sepM = local_separation(S, M, opt);
-[offM, resFloorM] = local_offset_metres(gTaps, S.tap_to_metres, sepM);
+% The delay axis is measured from the first path's LEADING EDGE - that is what
+% FP_INDEX is - but a peak-finder reports a lobe's MAXIMUM, and those are not
+% the same instant. The background panel shows the direct path's own lobe
+% peaking a couple of taps after its leading edge; that gap is pulse shape,
+% not distance. A target's reflection is the same pulse convolved with the
+% same receiver, so its lobe peaks the same couple of taps after ITS own
+% leading edge - and reading that maximum against the direct path's leading
+% edge overstates every range by exactly that offset, every single time.
+%
+% So the offset is measured from the background's own direct path and taken
+% back off the delay axis, which also puts the direct path's lobe peak at 0 m
+% where it belongs. Self-calibrating on purpose: change the PRF, preamble or
+% channel and the pulse shape changes with it, and this follows automatically
+% instead of baking in a constant that silently goes stale.
+sepM      = local_separation(S, M, opt);
+pulseTaps = local_pulse_peak_offset(gTaps, bg.mu);
+[offM, resFloorM] = local_offset_metres(gTaps - pulseTaps, S.tap_to_metres, sepM);
 
 noiseSigma = local_neg_noise(dAmp);
 detThresh  = opt.NoiseSigmaK * noiseSigma;
@@ -175,6 +190,13 @@ if opt.Verbose
     if isfinite(detThresh)
         fprintf('Noise floor: sigma %.4g from %d negative sample(s), threshold %gx = %.4g\n', ...
             noiseSigma, sum(dAmp < 0), opt.NoiseSigmaK, detThresh);
+    end
+    if pulseTaps > 0
+        fprintf(['Pulse shape: direct path peaks %+g tap(s) after its leading edge; ' ...
+                 'that offset is removed from the distance axis\n'], pulseTaps);
+    else
+        fprintf(['Pulse shape: no lead-edge-to-peak offset found in the background ' ...
+                 '- distance axis left uncorrected\n']);
     end
 end
 
@@ -207,6 +229,7 @@ out.diff       = dAmp;
 out.diffPos    = dPos;        % negatives clipped - what the final panel draws
 out.offsetM    = offM;        % ellipse offset from the tag-anchor baseline
 out.separation = sepM;
+out.pulseTaps  = pulseTaps;   % lead-edge-to-peak gap removed from the axis
 out.resFloorM  = resFloorM;   % nearest offset one tap can express
 out.noiseSigma = noiseSigma;
 out.detThresh  = detThresh;
@@ -355,6 +378,43 @@ if ~isempty(tok)
                  'this capture recorded it. Pass Separation to be sure.'], ...
                  val, S.run_label);
     end
+end
+end
+
+% =========================================================================
+function k = local_pulse_peak_offset(gTaps, bgMu)
+%LOCAL_PULSE_PEAK_OFFSET  Leading-edge-to-peak gap of the direct path, in taps.
+%
+% FP_INDEX marks where the first path starts RISING, because that is the
+% estimate that stays unbiased when multipath piles up behind it. The pulse's
+% actual maximum lands a little later, and how much later is a property of
+% the transmitted pulse and the receiver, identical for every path in the
+% same capture. Measuring it on the direct path therefore calibrates it for
+% the target's reflection too.
+%
+% Searched in a window just after the first path rather than as a global
+% argmax: in a cluttered room the loudest thing in the whole background trace
+% can easily be a wall return 25 taps out, and calibrating the axis on that
+% would push every reported range the wrong way by metres. If nothing in the
+% window looks like a peak, returns 0 and the axis is simply left alone.
+k = 0;
+
+% The direct path's lobe has to be within a few taps of its own leading edge.
+win = gTaps >= 0 & gTaps <= 8;
+if ~any(win)
+    return
+end
+
+v = bgMu;
+v(~win) = NaN;
+[pk, j] = max(v);
+if ~isfinite(pk) || pk <= 0
+    return
+end
+
+k = gTaps(j);
+if ~isfinite(k) || k < 0
+    k = 0;
 end
 end
 
@@ -550,7 +610,7 @@ function fig = local_plot(R, showSD)
 % dashed black grid. Every value comes from aps006_style so the single-frame
 % figure and these three panels cannot drift apart.
 st  = aps006_style();
-fig = figure('Position', [80 40 950 940]);
+fig = figure('Color', st.figureColour, 'Position', [80 40 950 940]);
 tl  = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ttl = 'CIR by phase';
@@ -668,7 +728,9 @@ xlabel(ax, 'Offset from tag-anchor baseline (m)', 'FontSize', st.labelFontSize);
 ylabel(ax, ['\Delta ' st.yLabelNorm], 'FontSize', st.labelFontSize);
 title(ax, 'Difference (Phase 2 - Background), negatives removed', ...
     'FontSize', st.labelFontSize, 'FontWeight', 'normal');
-subtitle(ax, sprintf('ellipse geometry, foci %.3g m apart', R.separation), ...
+subtitle(ax, sprintf(['ellipse geometry, foci %.3g m apart; ' ...
+    'lead-edge-to-peak offset of %+g tap(s) removed'], ...
+    R.separation, R.pulseTaps), ...
     'FontSize', st.fontSize, 'FontWeight', 'normal');
 legend(ax, [hD hF hT hP], 'Location', 'northeast', ...
     'FontSize', st.legendSize, 'Box', 'on', 'EdgeColor', [0 0 0]);
@@ -740,7 +802,7 @@ if ~isempty(j) && isfinite(ph.mu(j))
     hP = plot(ax, gTaps(j), ph.mu(j), st.peakMarker, ...
         'Color', st.peakColour, 'MarkerFaceColor', st.peakFace, ...
         'MarkerSize', st.peakSize, ...
-        'DisplayName', sprintf('Peak @ %+g', gTaps(j)));
+        'DisplayName', sprintf('Peak @ %+g taps', gTaps(j)));
 end
 
 hN = gobjects(0);
