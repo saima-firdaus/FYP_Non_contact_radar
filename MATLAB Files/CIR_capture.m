@@ -77,7 +77,7 @@ WALK_DURATION_S  = 10;          % break length; walk to your mark in this window
 % lands in session_info.csv so a folder full of timestamps is still readable
 % six weeks later. Examples: "trial1_human_2m_los", "control_empty".
 %RUN_LABEL        = "trial1_human_2m_los";
-RUN_LABEL        = "ch5_sep1.5m_d2m";
+RUN_LABEL        = "ch5_sep1m_cupboardClose_wadrobe1.75m";
 
 % ---- Subdirectory names --------------------------------------------------
 % Change these if you prefer different labels. The numeric prefix just keeps
@@ -433,4 +433,4 @@ exportgraphics(fig, fullfile(outDir, 'cir_plot.png'), 'Resolution', 200);
 savefig(fig, fullfile(outDir, 'cir_plot.fig'));
 
 fprintf("Done. All output written to %s\n", outDir);
-fprintf("Next: cir_phase_analysis('%s')\n", outDir);
+fprintf("Next: cir_phase_analysis2('%s')\n", outDir);

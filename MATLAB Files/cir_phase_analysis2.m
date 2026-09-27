@@ -155,6 +155,7 @@ dAmp = p2.mu - bg.mu;
 % has to be before it means anything. That estimate is taken BEFORE clipping
 % and drawn as the detection threshold, so removing the negatives does not
 % throw away the one thing they were telling you.
+
 % The delay axis is measured from the first path's LEADING EDGE - that is what
 % FP_INDEX is - but a peak-finder reports a lobe's MAXIMUM, and those are not
 % the same instant. The background panel shows the direct path's own lobe
