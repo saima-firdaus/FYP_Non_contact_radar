@@ -88,7 +88,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % Straight-line distance between the tag and the anchor, in metres. Recorded
 % in frame_metadata.csv for traceability only - nothing in this pipeline
 % computes from it any more, since this stage stays on the raw tap axis.
-TAG_ANCHOR_DIST_M = 1;
+TAG_ANCHOR_DIST_M = 1.5;
 
 % ---- Plot ----------------------------------------------------------------
 % The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
@@ -433,4 +433,4 @@ exportgraphics(fig, fullfile(outDir, 'cir_plot.png'), 'Resolution', 200);
 savefig(fig, fullfile(outDir, 'cir_plot.fig'));
 
 fprintf("Done. All output written to %s\n", outDir);
-fprintf("Next: cir_phase_analysis('%s')\n", outDir);
+fprintf("Next: cir_phase_analysis2('%s')\n", outDir);
