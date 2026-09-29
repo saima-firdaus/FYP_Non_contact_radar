@@ -11,6 +11,7 @@ function st = aps006_style()
 %   peak    "Rep:Peak" - filled black diamond sitting on the curve
 %   noise   "Rep: Noise Level", STD_NOISE x NTM - cyan horizontal line
 %   diff    a phase-2-minus-background difference, which can go negative
+%   sdDiff  the same difference taken on the SD across frames, not the mean
 %   zero    a neutral reference line (zero amplitude, or zero taps)
 %
 % Change a value here and every figure in the pipeline follows. If you change
@@ -46,6 +47,9 @@ st.noiseLabel   = 'Rep: Noise Level';
 st.diffColour   = [0.49 0.18 0.56];   % purple, so it is never mistaken
 st.diffWidth    = 1.3;                % for one of the two phase traces
 
+st.sdDiffColour = [0 0.5 0];          % dark green, so the SD difference is
+                                      % never read as the purple mean one
+
 st.controlColour = [0.35 0.35 0.35];  % the empty-room control difference,
 st.controlStyle  = '--';              % dashed and grey: a floor, not a signal
 st.controlWidth  = 1.2;
@@ -72,6 +76,7 @@ st.headroom      = 1.12;              % ylim top = headroom x the peak
 
 st.xLabelTap    = 'Sample Index';
 st.xLabelFP     = 'Taps from First Path';
+st.xLabelDist   = 'Distance from tag-anchor midpoint (m)';
 st.yLabelRaw    = 'CIR Amplitude';
 st.yLabelNorm   = 'CIR Amplitude / RXPACC';
 end

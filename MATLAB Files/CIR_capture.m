@@ -28,7 +28,7 @@
 %       frame_0000_aligned.csv    one CSV per frame, on the FP-relative axis
 %       cir_mean.csv              the frame-average over the whole session
 %     frame_metadata.csv        header values (RX_TS, FP_INDEX, ...) per frame
-%     session_info.csv          the phase timings this run actually used
+%     session_info.csv          the phase timings and geometry this run used
 %     cir_plot.png              the figure below
 %     cir_plot.fig              editable MATLAB figure
 %
@@ -85,9 +85,12 @@ RUN_LABEL        = "ch5_sep1m_d3m";
 ALIGNED_SUBDIR   = '02_lde_aligned';
 
 % ---- Geometry ------------------------------------------------------------
-% Straight-line distance between the tag and the anchor, in metres. Recorded
-% in frame_metadata.csv for traceability only - nothing in this pipeline
-% computes from it any more, since this stage stays on the raw tap axis.
+% Straight-line distance between the tag and the anchor, in metres. This
+% script itself stays on the raw tap axis and never uses it, but it is
+% written into session_info.csv (and every row of frame_metadata.csv), and
+% cir_phase_analysis.m uses it to turn taps into distance out from the
+% tag-anchor midpoint. Update it whenever you move the boards: a stale value
+% here puts every distance axis in the wrong place.
 TAG_ANCHOR_DIST_M = 1;
 
 % ---- Plot ----------------------------------------------------------------
@@ -151,19 +154,24 @@ end
 fprintf("Saving this capture to %s\n", outDir);
 fprintf("  LDE-aligned data   -> %s\n", ALIGNED_SUBDIR);
 fprintf("  run label          -> %s\n", RUN_LABEL);
+fprintf("  tag-anchor dist    -> %g m\n", TAG_ANCHOR_DIST_M);
 
 % ---- Session description -------------------------------------------------
 % Written before the port is even opened, so that a run interrupted halfway
 % still leaves behind the phase boundaries its frames were timed against.
 % cir_phase_analysis.m reads this instead of asking you to retype the
-% timings, which is the only way the two can never disagree.
+% timings, which is the only way the two can never disagree. The same goes
+% for tag_anchor_dist_m, which it needs for the distance axis; it goes on the
+% end so the older columns keep their places.
 sessionT = table( ...
     string(RUN_LABEL), string(runStamp), CAPTURE_SECONDS, WALK_PROMPT_AT_S, ...
     WALK_DURATION_S, TAPS_BEFORE_FP, TAPS_AFTER_FP, MEAN_GRID_STEP, ...
     TAP_TO_METRES, string(PORT), BAUD, string(ALIGNED_SUBDIR), ...
+    TAG_ANCHOR_DIST_M, ...
     'VariableNames', {'run_label','run_stamp','capture_seconds', ...
         'walk_prompt_at_s','walk_duration_s','taps_before_fp','taps_after_fp', ...
-        'mean_grid_step','tap_to_metres','port','baud','aligned_subdir'});
+        'mean_grid_step','tap_to_metres','port','baud','aligned_subdir', ...
+        'tag_anchor_dist_m'});
 writetable(sessionT, fullfile(outDir, 'session_info.csv'));
 fprintf("  phases             -> background 0-%gs | break %g-%gs | phase2 %g-%gs\n", ...
     WALK_PROMPT_AT_S, WALK_PROMPT_AT_S, WALK_PROMPT_AT_S + WALK_DURATION_S, ...
