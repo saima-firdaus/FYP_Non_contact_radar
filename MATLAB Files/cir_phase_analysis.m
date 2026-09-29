@@ -52,9 +52,7 @@ function out = cir_phase_analysis(captureDir, varargin)
 %   cir_diff.csv              phase 2 mean minus background mean, phase 2 SD
 %                             minus background SD, and each tap's distance
 %                             from the tag-anchor midpoint
-%   cir_phase_analysis.png / .fig
-%   cir_mean_variance_plot.png / .fig   the same six-panel figure, under a
-%                                       name that says what is on it
+%   cir_mean_variance_plot.png / .fig
 %
 % Returns a struct with the grid, both phase means, both differences, the
 % distance axis and the frame counts, so cir_compare_trial.m can reuse it
@@ -198,24 +196,65 @@ out.counts     = struct('background', sum(isBg), 'discarded', sum(isWalk), ...
 % ---- Figure --------------------------------------------------------------
 if opt.Plot
     out.fig = local_plot(out, logical(opt.ShowSD));
-    exportgraphics(out.fig, fullfile(captureDir, 'cir_phase_analysis.png'), ...
-        'Resolution', 200);
-    savefig(out.fig, fullfile(captureDir, 'cir_phase_analysis.fig'));
-
-    % The same figure under a second name. cir_phase_analysis is what this
-    % function has always written, so anything that looks for it still finds
-    % it; cir_mean_variance_plot is the name that says what is on it - the
-    % mean difference and the spread (SD) difference side by side. Copied,
-    % not exported again: savefig shrinks the figure to fit the screen, so a
-    % second export after it would come out shorter than the first.
-    for ext = {'.png', '.fig'}
-        copyfile(fullfile(captureDir, ['cir_phase_analysis' ext{1}]), ...
-                 fullfile(captureDir, ['cir_mean_variance_plot' ext{1}]));
-    end
-    if opt.Verbose
-        fprintf('Saved cir_phase_analysis.png / .fig and cir_mean_variance_plot.png / .fig\n');
+    % Named for what is on it: the mean difference and the spread (SD)
+    % difference side by side.
+    saved = local_save_figure(out.fig, captureDir, {'cir_mean_variance_plot'});
+    if opt.Verbose && ~isempty(saved)
+        fprintf('Saved %s\n', strjoin(saved, ', '));
     end
 end
+end
+
+% =========================================================================
+function saved = local_save_figure(fig, captureDir, baseNames)
+%LOCAL_SAVE_FIGURE  Save fig as <name>.png and <name>.fig for each name.
+%
+% The figure is rendered once, to a PNG and a .fig in tempdir, and those
+% are then copied to every destination. Rendering once is what keeps the
+% copies identical: after the first export MATLAB shrinks the window to fit
+% the screen, so a second export straight from the figure comes out shorter
+% than the first.
+%
+% Each copy is made on its own, so one destination that cannot be written
+% does not stop the rest. The usual culprit is the old file still being open
+% somewhere - an image viewer, the File Explorer preview pane - or briefly
+% held by OneDrive or a virus scanner; writing straight into such a file is
+% what made exportgraphics fail with "PNG library failed: Could not open
+% file". A held file gets a few retries, since those locks are often gone
+% within a second, and after that a warning naming it: the CSVs and every
+% other figure file are already saved, and throwing all of that away over
+% one locked file would be worse than leaving that one file stale.
+nTries = 3;
+tmp    = struct('png', [tempname '.png'], 'fig', [tempname '.fig']);
+exportgraphics(fig, tmp.png, 'Resolution', 200);
+savefig(fig, tmp.fig);
+
+saved = {};
+for ext = {'png', 'fig'}
+    for i = 1:numel(baseNames)
+        name = [baseNames{i} '.' ext{1}];
+        dest = fullfile(captureDir, name);
+        for attempt = 1:nTries
+            try
+                copyfile(tmp.(ext{1}), dest);
+                saved{end+1} = name; %#ok<AGROW>
+                break
+            catch ME
+                if attempt < nTries
+                    pause(1);
+                else
+                    warning(['Could not write %s after %d tries (%s).\n' ...
+                             'It is most likely open in another program ' ...
+                             '(image viewer, File Explorer preview pane) or ' ...
+                             'being synced by OneDrive. Close it and rerun - ' ...
+                             'everything else from this run was saved.'], ...
+                             dest, nTries, ME.message);
+                end
+            end
+        end
+    end
+end
+delete(tmp.png, tmp.fig);
 end
 
 % =========================================================================
