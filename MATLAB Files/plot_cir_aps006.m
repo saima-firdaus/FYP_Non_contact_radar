@@ -124,6 +124,7 @@ function fig = plot_cir_aps006(sample, amp, meta, opts)
               'FontSize', 12, 'FontWeight', 'normal');
     end
 
+    % ***** PREVIOUSLY THIS BLOCK WAS DELETED *****
     % ---- RXPWR ----------------------------------------------------------
     % The one header value carried onto the figure. RXPACC and the capture
     % timestamp stay in frame_metadata.csv where they belong: they say
@@ -133,7 +134,7 @@ function fig = plot_cir_aps006(sample, amp, meta, opts)
         subtitle(ax, sprintf('RXPWR %.1f dBm', rxPwr), ...
                  'FontSize', 11, 'FontWeight', 'normal');
     end
-
+    % *********************************************
     legend(ax, [hCIR hFp hPk hNz], 'Location', 'northeast', ...
            'FontSize', 10, 'Box', 'on', 'EdgeColor', [0 0 0]);
 end
