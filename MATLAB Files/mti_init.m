@@ -27,7 +27,8 @@ S.noiseIdx = find(S.grid >= cfg.NoiseWindow(1) & S.grid <= cfg.NoiseWindow(2));
 % Timing
 S.nIn      = 0;                  % frames fed in
 S.t0       = NaN;                % time of first frame
-S.lastRxTs = NaN;                % for elapsed time from RX_TS if needed
+S.lastRxTs = NaN;                % last RX_TS, frame spacing comes from it
+S.lastElapsed = NaN;             % last host arrival time
 S.rxTime   = 0;
 
 % Learning (empty scene)

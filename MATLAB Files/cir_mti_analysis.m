@@ -68,12 +68,12 @@ end
 S = mti_init(cfg);
 n = numel(frames);
 t = nan(n,1); fno = nan(n,1); rDet = nan(n,1); rTrk = nan(n,1);
-vTrk = nan(n,1); snr = nan(n,1); status = cell(n,1);
+vTrk = nan(n,1); snr = nan(n,1); status = cell(n,1); lag = nan(n,1);
 Emap = [];
 for i = 1:n
     [S, R] = mti_step(S, frames{i});
     t(i) = R.t; fno(i) = R.frameNo; rDet(i) = R.rDet; rTrk(i) = R.rTrack;
-    vTrk(i) = R.vTrack; snr(i) = R.snrDB; status{i} = R.status;
+    vTrk(i) = R.vTrack; snr(i) = R.snrDB; status{i} = R.status; lag(i) = R.lag;
     if ~isempty(R.energy)
         if isempty(Emap), Emap = nan(numel(R.energy), n); end
         Emap(:, i) = R.energy ./ R.threshold;
@@ -98,6 +98,14 @@ fprintf('Detections  : %d of %d frames after learning (%.0f%%)\n', ...
     sum(isfinite(rDet)), sum(live), 100*sum(isfinite(rDet))/max(sum(live),1));
 if any(isfinite(rTrk))
     fprintf('Distance    : %.2f to %.2f m (tracked)\n', min(rTrk), max(rTrk));
+end
+if any(isfinite(lag))
+    % elapsed_s is when MATLAB read each frame; t now follows the anchor's
+    % RX timestamps, so the difference is how far the live loop was behind.
+    lagRel = lag - min(lag);
+    fprintf('Live lag    : median %.2f s, max %.2f s (host read time vs anchor timestamps)\n', ...
+        median(lagRel(isfinite(lagRel))), max(lagRel));
+    out.lag = lagRel;
 end
 truth = local_truth(src);
 if ~isempty(truth)

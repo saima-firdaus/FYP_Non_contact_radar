@@ -20,7 +20,8 @@ function [S, R] = mti_step(S, frame)
 %      tracker
 %
 % R fields:
-%   t          elapsed seconds
+%   t          elapsed seconds, spaced by the anchor's own RX timestamps
+%   lag        seconds the host read this frame after it arrived (live only)
 %   status     'settling' | 'learning' | 'tracking' | 'coasting' | 'no target'
 %   rDet       raw detected distance this frame (m), NaN if none
 %   rTrack     tracked distance (m), NaN if no track
@@ -40,16 +41,17 @@ nG = numel(S.grid);
 
 R = struct('t', NaN, 'status', 'settling', 'rDet', NaN, 'rTrack', NaN, ...
            'vTrack', NaN, 'snrDB', NaN, 'energy', [], 'threshold', [], ...
-           'shift', 0, 'learnProgress', 0, 'frameNo', NaN, ...
+           'shift', 0, 'learnProgress', 0, 'frameNo', NaN, 'lag', NaN, ...
            'xAligned', [], 'y', [], 'gain', NaN);
 
 % ---- 0. Time ----------------------------------------------------------------
-t = local_time(frame, S);
-if isfield(frame.meta, 'RX_TS'), S.lastRxTs = frame.meta.RX_TS; end
+[t, S] = local_time(frame, S);
 if isfield(frame.meta, 'FRAME'), R.frameNo = frame.meta.FRAME; end
 if isnan(S.t0), S.t0 = t; end
-S.rxTime = t;
 R.t = t;
+if isfield(frame.meta, 'elapsed_s') && isfinite(frame.meta.elapsed_s)
+    R.lag = frame.meta.elapsed_s - t;          % how far the host read behind
+end
 
 if t - S.t0 < cfg.SettleSeconds
     return
@@ -151,23 +153,39 @@ cand = local_candidates(S, E);
 end
 
 % =============================================================================
-function t = local_time(frame, S)
-% Host arrival time if the frame carries it (live capture / cir_mti_live
-% logs), else the DW1000 RX timestamp (40-bit, 15.65 ps ticks, wraps every
-% ~17.2 s), else assume 10 Hz.
+function [t, S] = local_time(frame, S)
+% Frame time. The spacing comes from the DW1000 RX timestamp (40-bit, 15.65
+% ps ticks, wraps every 17.2 s), which is when the anchor actually received
+% the frame. The host arrival time (elapsed_s) only anchors the first frame
+% and counts wraps across long gaps: when MATLAB falls behind, it reads a
+% backlog of frames in a burst a few ms apart, and host time would make the
+% tracker see impossible speeds and the display lag. Without RX_TS, host
+% time is used; without either, 10 Hz is assumed.
 m = frame.meta;
-if isfield(m, 'elapsed_s') && isfinite(m.elapsed_s)
-    t = m.elapsed_s;
-elseif isfield(m, 'RX_TS') && isfinite(m.RX_TS) && isfinite(S.lastRxTs)
+hasEl = isfield(m, 'elapsed_s') && isfinite(m.elapsed_s);
+hasTs = isfield(m, 'RX_TS') && isfinite(m.RX_TS);
+if hasTs && isfinite(S.lastRxTs)
     tick = 1 / (128 * 499.2e6);
-    wrap = 2^40;
-    dts  = mod(m.RX_TS - S.lastRxTs, wrap);
-    t    = S.rxTime + dts * tick;
-elseif isfield(m, 'RX_TS') && isfinite(m.RX_TS)
+    wrapS = 2^40 * tick;
+    dt = mod(m.RX_TS - S.lastRxTs, 2^40) * tick;
+    if hasEl && isfinite(S.lastElapsed)
+        dHost = m.elapsed_s - S.lastElapsed;
+        dt = dt + wrapS * max(0, round((dHost - dt) / wrapS));
+        if dt > dHost + 5 && dt > 5
+            dt = max(dHost, 0);        % counter jumped (anchor reset): trust the host
+        end
+    end
+    t = S.rxTime + dt;
+elseif hasEl
+    t = m.elapsed_s;
+elseif hasTs
     t = 0;
 else
     t = (S.nIn - 1) * 0.1;
 end
+if hasTs, S.lastRxTs = m.RX_TS; end
+if hasEl, S.lastElapsed = m.elapsed_s; end
+S.rxTime = t;
 end
 
 % =============================================================================
@@ -216,6 +234,9 @@ mag(~pk) = -Inf;
 S.refX = xg * conj(xg(j)) / abs(xg(j));
 if isreal(xg), S.refX = abs(xg); end
 S.k0   = S.grid(j);
+if isfield(cfg, 'PeakOffsetTaps') && ~isempty(cfg.PeakOffsetTaps)
+    S.k0 = cfg.PeakOffsetTaps;
+end
 S.haveRef = true;
 
 S.rangeAxis = mti_geometry('tap2range', S.grid, cfg, S.k0);

@@ -26,7 +26,7 @@ cfg = struct();
 
 cfg.Separation     = 1.0;       % m, tag-anchor spacing (foci of the ellipse)
 cfg.TapToMetres    = 0.30028;   % one accumulator tap = 1.0016 ns of path
-cfg.MinRange       = 0.50;      % m, nearest distance searched. Closer than
+cfg.MinRange       = 0.75;      % m, nearest distance searched. Closer than
                                 % this the echo sits on the direct path's own
                                 % pulse and cannot be separated from it.
 cfg.MaxRange       = 3.50;      % m, furthest distance searched (walk <= 3.2 m)
@@ -54,6 +54,12 @@ cfg.FineAlign      = true;
 cfg.FineAlignMaxTaps = 0.75;
 cfg.FineAlignStep  = 0.05;
 cfg.DirectWindow   = [-3 8];    % taps: where the direct path lives
+% Lead-edge-to-peak offset of the direct pulse (k0), which every distance is
+% measured from. [] = the maximum 0..8 taps after FP in the first frame. Set
+% it (typically 1.5-2.5) if that maximum is a floor/ceiling bounce sitting
+% on the pulse's tail rather than the direct pulse: each tap of error moves
+% every distance by about 0.15 m.
+cfg.PeakOffsetTaps = [];
 
 % ---- Clutter removal (the MTI filter) --------------------------------------
 %  'clutter'  y_n - B_n. B is the static scene: learned while the scene is
@@ -66,8 +72,13 @@ cfg.DirectWindow   = [-3 8];    % taps: where the direct path lives
 cfg.MTIMode        = 'clutter';
 cfg.ClutterAlpha   = 0.02;      % 0 = frozen background; 0.02 at ~10 Hz ~ 5 s memory
 cfg.ClutterFreeze  = 20;        % taps with motion on them update this many times slower
-cfg.LearnSeconds   = 5;         % keep the scene EMPTY for this long at the start
-cfg.SettleSeconds  = 1;         % frames dropped first (AGC / oscillator settling)
+% The scene must be EMPTY for SettleSeconds + LearnSeconds (13 s) at the
+% start. Settling skips the start-up (and you walking out of view); the
+% learning window sets the clutter map and, more importantly, the per-tap
+% threshold, which is frozen after it. ~100 frames estimate each tap's
+% floor to about +/-10% (vs +/-14% from 50), so fewer false alarms.
+cfg.LearnSeconds   = 10;        % learn the empty room for this long
+cfg.SettleSeconds  = 3;         % frames dropped first (AGC / oscillator settling)
 
 % ---- Detection -----------------------------------------------------------
 % MTI energy |MTI|^2 is averaged over the last IntegrateFrames frames, then

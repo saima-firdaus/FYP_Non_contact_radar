@@ -52,6 +52,11 @@ end
 info.kind = 'serial_log';
 info.coherent = true;
 info.nRejected = P.nRejected;
+info.nBadFrames = P.nBadFrames;
+if P.nBadFrames > 0
+    fprintf('Dropped %d corrupted frame(s) (truncated or spliced) of %d.\n', ...
+        P.nBadFrames, P.nBadFrames + numel(frames));
+end
 end
 
 % =============================================================================
@@ -65,7 +70,7 @@ if isempty(iCsv)
 end
 numCols = setdiff(1:numel(hdr), iCsv);
 frames = cell(1, 0);
-nMissing = 0;
+nMissing = 0; nBad = 0; maxRows = 0;
 for r = 1:size(rows, 1)
     rel = strrep(strrep(rows{r, iCsv}, '\', filesep), '/', filesep);
     f = fullfile(dirName, rel);
@@ -74,6 +79,14 @@ for r = 1:size(rows, 1)
     it = find(strcmpi(h2, 'taps_from_fp'), 1);
     ia = find(strcmpi(h2, 'amplitude_norm'), 1);
     if isempty(it) || isempty(ia), nMissing = nMissing + 1; continue; end
+    is = find(strcmpi(h2, 'sample'), 1);
+    if ~isempty(is)
+        smp = sort(str2double(d2(:, is)));
+        if any(diff(smp) ~= 1) || numel(smp) < 0.95 * maxRows
+            nBad = nBad + 1; continue           % truncated or spliced frame
+        end
+        maxRows = max(maxRows, numel(smp));
+    end
     meta = struct();
     for k = numCols
         meta.(regexprep(hdr{k}, '[^A-Za-z0-9_]', '_')) = str2double(rows{r, k});
@@ -90,6 +103,10 @@ end
 if nMissing > 0
     warning('%d frame file(s) listed in frame_metadata.csv were missing.', nMissing);
 end
+if nBad > 0
+    fprintf('Dropped %d corrupted frame(s) (truncated or spliced).\n', nBad);
+end
+info.nBadFrames = nBad;
 info.kind = 'cir_capture_aligned';
 info.coherent = false;
 end

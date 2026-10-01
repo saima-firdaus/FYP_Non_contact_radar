@@ -22,8 +22,13 @@ function out = cir_phase_analysis(captureDir, varargin)
 % frames never get written - so every average here is over however many
 % valid frames actually landed in the window, never a fixed count.
 %
+% Each phase gives two things per tap: the mean across frames and the SD
+% across frames. Both are differenced, phase 2 minus background, so there are
+% two detection traces - a change in level and a change in spread - and both
+% are also put on a distance axis, measured out from the tag-anchor midpoint.
+%
 % Name-value options:
-%   'Plot'           true    draw and save the three-panel figure
+%   'Plot'           true    draw and save the six-panel figure
 %   'ShowSD'         true    shade +/- 1 SD across frames on the phase panels
 %   'MinFrameFrac'   0.8     a grid point is only averaged where at least this
 %                            fraction of the phase's frames reach it. FP_INDEX
@@ -35,18 +40,26 @@ function out = cir_phase_analysis(captureDir, varargin)
 %                            keep everything.
 %   'WalkPromptAtS'  []      override session_info.csv (for older captures)
 %   'WalkDurationS'  []      likewise
+%   'TagAnchorDistM' []      tag-anchor separation D in metres, for the
+%                            distance axis. Empty takes it from
+%                            session_info.csv, else from the
+%                            tag_anchor_dist_m column of frame_metadata.csv.
 %   'Verbose'        true
 %
 % Writes into captureDir:
 %   cir_mean_background.csv   taps_from_fp, amplitude_norm_mean,
 %   cir_mean_phase2.csv       amplitude_norm_sd, n_frames
-%   cir_diff.csv              phase 2 mean minus background mean
-%   cir_phase_analysis.png / .fig
+%   cir_diff.csv              phase 2 mean minus background mean, phase 2 SD
+%                             minus background SD, and each tap's distance
+%                             from the tag-anchor midpoint
+%   cir_mean_variance_plot.png / .fig
 %
-% Returns a struct with the grid, both phase means, the difference and the
-% frame counts, so cir_compare_trial.m can reuse it without re-reading CSVs.
+% Returns a struct with the grid, both phase means, both differences, the
+% distance axis and the frame counts, so cir_compare_trial.m can reuse it
+% without re-reading CSVs.
 %
-% See also CIR_COMPARE_TRIAL, CIR_MULTI_TRIAL, PLOT_CIR_APS006.
+% See also CIR_COMPARE_TRIAL, CIR_MULTI_TRIAL, CIR_TAPS_TO_DISTANCE,
+%          PLOT_CIR_APS006.
 
 % ---- Arguments -----------------------------------------------------------
 if nargin < 1 || isempty(captureDir)
@@ -63,6 +76,7 @@ p.addParameter('ShowSD',        true,  @(x) islogical(x) || isnumeric(x));
 p.addParameter('MinFrameFrac',  0.8,   @(x) isscalar(x) && x >= 0 && x <= 1);
 p.addParameter('WalkPromptAtS', [],    @(x) isempty(x) || isscalar(x));
 p.addParameter('WalkDurationS', [],    @(x) isempty(x) || isscalar(x));
+p.addParameter('TagAnchorDistM', [],   @(x) isempty(x) || (isscalar(x) && x >= 0));
 p.addParameter('Verbose',       true,  @(x) islogical(x) || isnumeric(x));
 p.parse(varargin{:});
 opt = p.Results;
@@ -90,6 +104,12 @@ if ~ismember('elapsed_s', M.Properties.VariableNames)
            'script - recapture with the current CIR_capture.m.'], captureDir);
 end
 
+% ---- Tag-anchor separation -----------------------------------------------
+% Needed for the distance axis only. Resolved into S the same way the phase
+% timings are, so out.session always carries the value that was used.
+[S.tag_anchor_dist_m, distSrc] = local_tag_anchor_dist(captureDir, S, M, ...
+    opt.TagAnchorDistM);
+
 el     = M.elapsed_s;
 isBg   = el <  S.walk_prompt_at_s;
 isWalk = el >= S.walk_prompt_at_s & el < breakEndsAt;
@@ -105,6 +125,7 @@ if opt.Verbose
         S.capture_seconds);
     fprintf('Frames    : %d background | %d discarded | %d phase2 (of %d)\n', ...
         sum(isBg), sum(isWalk), sum(isP2), height(M));
+    fprintf('Tag-anchor: D = %g m (from %s)\n', S.tag_anchor_dist_m, distSrc);
 end
 
 if sum(isBg) == 0 || sum(isP2) == 0
@@ -125,14 +146,31 @@ p2 = local_phase_average(captureDir, M(isP2, :), gTaps, S, 'phase2',     opt);
 % and it is free to go negative where the target shadowed an existing path.
 dAmp = p2.mu - bg.mu;
 
+% The same subtraction on the spread across frames instead of the level: a
+% target can change how much a tap fluctuates from frame to frame without
+% moving its mean much. Plain SD minus SD, not sqrt(Var_p2 - Var_bg), so it
+% too is free to go negative, and it is NaN wherever either phase's SD is -
+% which already covers the taps MinFrameFrac dropped.
+dSd = p2.sd - bg.sd;
+
+% ---- Distance ------------------------------------------------------------
+% Each tap's distance out from the tag-anchor midpoint, NaN before the first
+% path. Uses the same tap_to_metres the capture recorded.
+distM = cir_taps_to_distance(gTaps, S.tag_anchor_dist_m, S.tap_to_metres);
+
 % ---- Save ----------------------------------------------------------------
 bgT = table(gTaps, bg.mu, bg.sd, bg.nPer, 'VariableNames', ...
     {'taps_from_fp','amplitude_norm_mean','amplitude_norm_sd','n_frames'});
 p2T = table(gTaps, p2.mu, p2.sd, p2.nPer, 'VariableNames', ...
     {'taps_from_fp','amplitude_norm_mean','amplitude_norm_sd','n_frames'});
-dT  = table(gTaps, dAmp, bg.mu, p2.mu, bg.nPer, p2.nPer, 'VariableNames', ...
+% New columns go on the end, so anything reading the old ones by name or by
+% position is unaffected.
+dT  = table(gTaps, dAmp, bg.mu, p2.mu, bg.nPer, p2.nPer, ...
+    dSd, bg.sd, p2.sd, distM, 'VariableNames', ...
     {'taps_from_fp','amplitude_norm_diff','background_mean','phase2_mean', ...
-     'n_background','n_phase2'});
+     'n_background','n_phase2', ...
+     'amplitude_norm_sd_diff','background_sd','phase2_sd', ...
+     'distance_from_midpoint_m'});
 
 writetable(bgT, fullfile(captureDir, 'cir_mean_background.csv'));
 writetable(p2T, fullfile(captureDir, 'cir_mean_phase2.csv'));
@@ -150,19 +188,73 @@ out.gTaps      = gTaps;
 out.background = bg;
 out.phase2     = p2;
 out.diff       = dAmp;
+out.sdDiff     = dSd;
+out.distM      = distM;
 out.counts     = struct('background', sum(isBg), 'discarded', sum(isWalk), ...
                         'phase2', sum(isP2), 'total', height(M));
 
 % ---- Figure --------------------------------------------------------------
 if opt.Plot
     out.fig = local_plot(out, logical(opt.ShowSD));
-    exportgraphics(out.fig, fullfile(captureDir, 'cir_phase_analysis.png'), ...
-        'Resolution', 200);
-    savefig(out.fig, fullfile(captureDir, 'cir_phase_analysis.fig'));
-    if opt.Verbose
-        fprintf('Saved cir_phase_analysis.png / .fig\n');
+    % Named for what is on it: the mean difference and the spread (SD)
+    % difference side by side.
+    saved = local_save_figure(out.fig, captureDir, {'cir_mean_variance_plot'});
+    if opt.Verbose && ~isempty(saved)
+        fprintf('Saved %s\n', strjoin(saved, ', '));
     end
 end
+end
+
+% =========================================================================
+function saved = local_save_figure(fig, captureDir, baseNames)
+%LOCAL_SAVE_FIGURE  Save fig as <name>.png and <name>.fig for each name.
+%
+% The figure is rendered once, to a PNG and a .fig in tempdir, and those
+% are then copied to every destination. Rendering once is what keeps the
+% copies identical: after the first export MATLAB shrinks the window to fit
+% the screen, so a second export straight from the figure comes out shorter
+% than the first.
+%
+% Each copy is made on its own, so one destination that cannot be written
+% does not stop the rest. The usual culprit is the old file still being open
+% somewhere - an image viewer, the File Explorer preview pane - or briefly
+% held by OneDrive or a virus scanner; writing straight into such a file is
+% what made exportgraphics fail with "PNG library failed: Could not open
+% file". A held file gets a few retries, since those locks are often gone
+% within a second, and after that a warning naming it: the CSVs and every
+% other figure file are already saved, and throwing all of that away over
+% one locked file would be worse than leaving that one file stale.
+nTries = 3;
+tmp    = struct('png', [tempname '.png'], 'fig', [tempname '.fig']);
+exportgraphics(fig, tmp.png, 'Resolution', 200);
+savefig(fig, tmp.fig);
+
+saved = {};
+for ext = {'png', 'fig'}
+    for i = 1:numel(baseNames)
+        name = [baseNames{i} '.' ext{1}];
+        dest = fullfile(captureDir, name);
+        for attempt = 1:nTries
+            try
+                copyfile(tmp.(ext{1}), dest);
+                saved{end+1} = name; %#ok<AGROW>
+                break
+            catch ME
+                if attempt < nTries
+                    pause(1);
+                else
+                    warning(['Could not write %s after %d tries (%s).\n' ...
+                             'It is most likely open in another program ' ...
+                             '(image viewer, File Explorer preview pane) or ' ...
+                             'being synced by OneDrive. Close it and rerun - ' ...
+                             'everything else from this run was saved.'], ...
+                             dest, nTries, ME.message);
+                end
+            end
+        end
+    end
+end
+delete(tmp.png, tmp.fig);
 end
 
 % =========================================================================
@@ -323,11 +415,15 @@ end
 % =========================================================================
 function S = local_read_session(captureDir)
 %LOCAL_READ_SESSION  session_info.csv, with defaults for anything absent.
+%
+% tag_anchor_dist_m has no default: session_info.csv only carries it for
+% captures made since CIR_capture.m started writing it there, and for older
+% ones local_tag_anchor_dist falls back to frame_metadata.csv, not a guess.
 S = struct('run_label', "", 'run_stamp', "", 'capture_seconds', NaN, ...
            'walk_prompt_at_s', NaN, 'walk_duration_s', NaN, ...
            'taps_before_fp', 50, 'taps_after_fp', 100, ...
            'mean_grid_step', 0.5, 'tap_to_metres', 0.30028, ...
-           'aligned_subdir', '02_lde_aligned');
+           'aligned_subdir', '02_lde_aligned', 'tag_anchor_dist_m', NaN);
 
 f = fullfile(captureDir, 'session_info.csv');
 if ~isfile(f)
@@ -353,6 +449,50 @@ S.run_label      = string(S.run_label);
 end
 
 % =========================================================================
+function [D, src] = local_tag_anchor_dist(captureDir, S, M, optD)
+%LOCAL_TAG_ANCHOR_DIST  The tag-anchor separation, and where it came from.
+%
+% Tried in order: the TagAnchorDistM option, session_info.csv, then the
+% tag_anchor_dist_m column that frame_metadata.csv has carried on every frame
+% all along - which is what lets captures from before session_info.csv had
+% the field still resolve. The column holds one value per frame even though
+% it is set once per run, so a spread in it means the file was edited or
+% stitched together, and deserves a warning rather than a silent pick.
+if ~isempty(optD)
+    D   = optD;
+    src = 'TagAnchorDistM option';
+    return
+end
+
+if isnumeric(S.tag_anchor_dist_m) && isfinite(S.tag_anchor_dist_m)
+    D   = S.tag_anchor_dist_m;
+    src = 'session_info.csv';
+    return
+end
+
+if ismember('tag_anchor_dist_m', M.Properties.VariableNames) && ...
+        isnumeric(M.tag_anchor_dist_m)
+    v = M.tag_anchor_dist_m;
+    v = v(isfinite(v));
+    if ~isempty(v)
+        D   = v(1);
+        src = 'frame_metadata.csv';
+        if any(v ~= D)
+            warning(['tag_anchor_dist_m is not constant across frames in ' ...
+                     '%s (%g to %g m). Using the first, %g m.'], ...
+                     captureDir, min(v), max(v), D);
+        end
+        return
+    end
+end
+
+error(['No tag-anchor separation for %s: session_info.csv has no ' ...
+       'tag_anchor_dist_m, and frame_metadata.csv has no finite ' ...
+       'tag_anchor_dist_m column. Pass it in metres, e.g. ' ...
+       'cir_phase_analysis(captureDir, ''TagAnchorDistM'', 1.5).'], captureDir);
+end
+
+% =========================================================================
 function d = local_newest_capture(root)
 %LOCAL_NEWEST_CAPTURE  Most recently modified Capture_* folder under root.
 dd = dir(fullfile(root, 'Capture_*'));
@@ -366,15 +506,21 @@ end
 
 % =========================================================================
 function fig = local_plot(R, showSD)
-%LOCAL_PLOT  Background / phase 2 / difference, drawn like APS006 Figure 1.
+%LOCAL_PLOT  Both phases and both differences, drawn like APS006 Figure 1.
 %
 % Same instrument as plot_cir_aps006.m: blue asterisk-marked trace, red
 % first-path line, filled black diamond on the peak, cyan noise level,
 % dashed black grid. Every value comes from aps006_style so the single-frame
-% figure and these three panels cannot drift apart.
+% figure and these six panels cannot drift apart.
+%
+% The left column is the mean method and the right column the SD method:
+%
+%   row 1   background mean CIR           phase 2 mean CIR
+%   row 2   mean difference vs taps       SD difference vs taps
+%   row 3   mean difference vs distance   SD difference vs distance
 st  = aps006_style();
-fig = figure('Color', st.figureColour, 'Position', [80 40 950 940]);
-tl  = tiledlayout(fig, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+fig = figure('Color', st.figureColour, 'Position', [60 40 1500 1000]);
+tl  = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 ttl = 'CIR by phase';
 if strlength(R.session.run_label) > 0
@@ -385,7 +531,7 @@ end
 title(tl, ttl, 'FontSize', st.labelFontSize + 1, 'FontWeight', 'bold', ...
     'Interpreter', 'none');
 
-axList = gobjects(3,1);
+axList = gobjects(6,1);
 
 % One y-range for both phase panels. Two panels meant to be compared by eye
 % cannot be on scales that differ by however much autoscaling felt like - a
@@ -399,47 +545,97 @@ axList(1) = local_phase_panel(tl, R.gTaps, R.background, st, showSD, yr, ...
 axList(2) = local_phase_panel(tl, R.gTaps, R.phase2, st, showSD, yr, ...
     sprintf('Phase 2, target present (n = %d frames)', R.phase2.nFrames));
 
-% ---- Difference ----------------------------------------------------------
+% ---- Differences on the tap axis -----------------------------------------
+tapRange = [min(R.gTaps) max(R.gTaps)];
+tapMarks = local_marker_indices(R.gTaps);
+
+axList(3) = local_diff_panel(tl, R.gTaps, R.diff, tapRange, tapMarks, st, ...
+    st.diffColour, 'Phase 2 - Background', ...
+    'Difference (Phase 2 - Background)', ...
+    st.xLabelFP, ['\Delta ' st.yLabelNorm], 'Peak @ %+g');
+axList(4) = local_diff_panel(tl, R.gTaps, R.sdDiff, tapRange, tapMarks, st, ...
+    st.sdDiffColour, 'Phase 2 SD - Background SD', ...
+    'SD Difference (Phase 2 - Background)', ...
+    st.xLabelFP, ['\Delta SD ' st.yLabelNorm], 'Peak @ %+g');
+
+% ---- The same two differences on distance --------------------------------
+% Only taps >= 0 have a distance: nothing reflected arrives before the first
+% path. The markers are still picked on the tap grid, so each asterisk here
+% is the same sample as one on the tap panel above it, and the spacing
+% between them shows how the distance axis stretches near the first path.
+fwd       = R.gTaps >= 0;
+distX     = R.distM(fwd);
+distRange = [0 max(distX)];
+distMarks = local_marker_indices(R.gTaps(fwd));
+distSub   = sprintf('Tag-anchor separation D = %.2f m', ...
+    R.session.tag_anchor_dist_m);
+
+axList(5) = local_diff_panel(tl, distX, R.diff(fwd), distRange, distMarks, ...
+    st, st.diffColour, 'Phase 2 - Background', ...
+    'Difference vs distance', ...
+    st.xLabelDist, ['\Delta ' st.yLabelNorm], 'Peak @ %.2f m');
+axList(6) = local_diff_panel(tl, distX, R.sdDiff(fwd), distRange, distMarks, ...
+    st, st.sdDiffColour, 'Phase 2 SD - Background SD', ...
+    'SD Difference vs distance', ...
+    st.xLabelDist, ['\Delta SD ' st.yLabelNorm], 'Peak @ %.2f m');
+for ax = axList(5:6)'
+    subtitle(ax, distSub, 'FontSize', st.fontSize, 'FontWeight', 'normal');
+end
+
+% Link only panels that share an axis. Distance is not a linear function of
+% taps, so a tap panel and a distance panel zoomed "together" would be
+% showing different stretches of the channel.
+linkaxes(axList(1:4), 'x');
+linkaxes(axList(5:6), 'x');
+xlim(axList(1), tapRange);
+xlim(axList(5), distRange);
+end
+
+% =========================================================================
+function ax = local_diff_panel(tl, x, y, xr, mIdx, st, colour, traceName, ...
+                               titleStr, xLabel, yLabel, peakFmt)
+%LOCAL_DIFF_PANEL  One phase-2-minus-background trace, on taps or distance.
+%
+% All four difference panels are drawn here so that they cannot drift
+% apart: grey zero line, red first-path line at x = 0 (tap 0 is the first
+% path, and it maps to 0 m), the trace in the asterisk style, and a filled
+% black diamond on the largest excursion either way. mIdx picks which points
+% get an asterisk, so a distance panel can mark the same samples as the tap
+% panel it pairs with.
 ax = nexttile(tl); hold(ax,'on');
-plot(ax, [min(R.gTaps) max(R.gTaps)], [0 0], '-', ...
-    'Color', st.zeroColour, 'LineWidth', st.zeroWidth);
+plot(ax, xr, [0 0], '-', 'Color', st.zeroColour, 'LineWidth', st.zeroWidth);
 % cirWidth, not diffWidth: an asterisk drawn with a heavier stroke fills in
 % and reads as a dot, which would make this panel's marker look like a
-% different symbol from the two above it.
-hD = plot(ax, R.gTaps, R.diff, '-', 'Color', st.diffColour, ...
+% different symbol from the phase panels'.
+hD = plot(ax, x, y, '-', 'Color', colour, ...
     'LineWidth', st.cirWidth, 'Marker', st.cirMarker, ...
     'MarkerSize', st.cirMarkerSize, ...
-    'MarkerIndices', local_marker_indices(R.gTaps), ...
-    'DisplayName', 'Phase 2 - Background');
+    'MarkerIndices', mIdx, ...
+    'DisplayName', traceName);
 
-dr = local_pad_range(R.diff, st);
+dr = local_pad_range(y, st);
 hF = plot(ax, [0 0], dr, '-', 'Color', st.fpColour, ...
     'LineWidth', st.fpWidth, 'DisplayName', st.fpLabel);
 
 % The largest excursion either way. Same filled diamond as Rep:Peak, because
 % it plays the same role: this is the tap the eye should go to.
 hP = gobjects(0);
-[~, j] = max(abs(R.diff));
-if isfinite(R.diff(j))
-    hP = plot(ax, R.gTaps(j), R.diff(j), st.peakMarker, ...
+[~, j] = max(abs(y));
+if ~isempty(j) && isfinite(y(j))
+    hP = plot(ax, x(j), y(j), st.peakMarker, ...
         'Color', st.peakColour, 'MarkerFaceColor', st.peakFace, ...
         'MarkerSize', st.peakSize, ...
-        'DisplayName', sprintf('Peak @ %+g', R.gTaps(j)));
+        'DisplayName', sprintf(peakFmt, x(j)));
 end
 
 local_style_axes(ax, st);
-xlim(ax, [min(R.gTaps) max(R.gTaps)]);
+xlim(ax, xr);
 ylim(ax, dr);
-xlabel(ax, st.xLabelFP, 'FontSize', st.labelFontSize);
-ylabel(ax, ['\Delta ' st.yLabelNorm], 'FontSize', st.labelFontSize);
-title(ax, 'Difference (Phase 2 - Background)', ...
-    'FontSize', st.labelFontSize, 'FontWeight', 'normal');
+xlabel(ax, xLabel, 'FontSize', st.labelFontSize);
+ylabel(ax, yLabel, 'FontSize', st.labelFontSize);
+title(ax, titleStr, 'FontSize', st.labelFontSize, 'FontWeight', 'normal');
 legend(ax, [hD hF hP], 'Location', 'northeast', ...
     'FontSize', st.legendSize, 'Box', 'on', 'EdgeColor', [0 0 0]);
-axList(3) = ax;
-
-linkaxes(axList, 'x');
-xlim(axList(1), [min(R.gTaps) max(R.gTaps)]);
 end
 
 % =========================================================================

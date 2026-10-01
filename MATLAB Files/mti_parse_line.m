@@ -19,6 +19,9 @@ function [P, frame] = mti_parse_line(P, line)
 % come through without a change here. Frames with no "# END" are dropped,
 % and a sample row whose index is outside START..START+1024 is rejected, the
 % same guard CIR_capture.m uses against rows spliced by a dropped byte.
+% Whole frames are also rejected (counted in P.nBadFrames) unless their
+% samples form one contiguous run of the usual length: in CIR_capture data
+% about 6% of frames were truncated or two frames spliced together.
 %
 % frame fields:
 %   meta     struct of header values (FRAME, FP_INDEX, RXPACC, ...)
@@ -28,7 +31,8 @@ function [P, frame] = mti_parse_line(P, line)
 frame = [];
 if nargin == 0
     P = struct('meta', [], 'rows', zeros(0,3), 'nRows', 0, ...
-               'inFrame', false, 'nRejected', 0, 'nFrames', 0);
+               'inFrame', false, 'nRejected', 0, 'nFrames', 0, ...
+               'nBadFrames', 0, 'maxRows', 0);
     return
 end
 
@@ -54,9 +58,21 @@ if line(1) == '#'
     elseif strncmp(line, '# END', 5)
         if P.inFrame && P.nRows > 0
             rows = sortrows(P.rows(1:P.nRows, :), 1);
-            frame = struct('meta', P.meta, 'sample', rows(:,1), ...
-                           're', rows(:,2), 'im', rows(:,3));
-            P.nFrames = P.nFrames + 1;
+            % Integrity: one frame is ONE contiguous run of accumulator
+            % samples. A dropped header or "# END" splices two frames into
+            % one (250-290 rows, duplicated or gapped indices); dropped rows
+            % leave gaps or a short frame. Both pass the per-row START check
+            % but wreck any frame-to-frame comparison, so reject them here.
+            ds = diff(rows(:,1));
+            ok = all(ds == 1) && P.nRows >= 0.95 * P.maxRows;
+            if ok
+                frame = struct('meta', P.meta, 'sample', rows(:,1), ...
+                               're', rows(:,2), 'im', rows(:,3));
+                P.nFrames = P.nFrames + 1;
+                P.maxRows = max(P.maxRows, P.nRows);
+            else
+                P.nBadFrames = P.nBadFrames + 1;
+            end
         end
         P.inFrame = false;
         P.nRows   = 0;

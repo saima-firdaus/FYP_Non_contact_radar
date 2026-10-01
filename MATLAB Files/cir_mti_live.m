@@ -24,7 +24,7 @@ function out = cir_mti_live(varargin)
 %   1. Power the tag and anchor, place them Separation apart, facing the room.
 %   2. Run cir_mti_live. Opening the port resets the ESP32; wait for frames.
 %   3. Keep the area in front of the modules EMPTY until "READY" is printed
-%      (SettleSeconds + LearnSeconds, 6 s by default). That is where the
+%      (SettleSeconds + LearnSeconds, 13 s by default). That is where the
 %      static room and the threshold are learned.
 %   4. Walk in front of the modules / move your arms. Distance updates live.
 %
@@ -179,8 +179,11 @@ while true
         end
     end
 
-    % -- redraw at most ~15 times a second --
-    if o.Display && ~isempty(newFrames) && toc(tWall) - lastDraw > 0.066
+    % -- redraw at most ~15 times a second; while MATLAB is behind the
+    %    modules, only once a second so it can catch up --
+    behind = ~isempty(lastR) && isfinite(lastR.lag) && lastR.lag > 0.3;
+    if o.Display && ~isempty(newFrames) && toc(tWall) - lastDraw > 0.066 ...
+            && (~behind || toc(tWall) - lastDraw > 1)
         local_update_figure(G, S, H, lastR, cfg, o);
         try, drawnow('limitrate'); catch, drawnow; end %#ok<NOCOM>
         lastDraw = toc(tWall);
@@ -193,6 +196,10 @@ if o.Display && ishandle(G.fig) && ~isempty(lastR)
 end
 
 % ---- Save + return ---------------------------------------------------------------------
+if ~isReplay && P.nBadFrames > 0
+    fprintf('Dropped %d corrupted frame(s) (truncated or spliced) of %d.\n', ...
+        P.nBadFrames, P.nBadFrames + P.nFrames);
+end
 if ~isReplay && ~isempty(L.dir)
     local_write_track(fullfile(L.dir, 'mti_track.csv'), H);
     fprintf('\nSaved %s\n', L.dir);
@@ -218,6 +225,9 @@ switch R.status
     case 'tracking'
         s = sprintf('%6.1f s | distance %5.2f m | %s | SNR %4.1f dB', ...
             R.t, R.rTrack, local_motion_words(R.vTrack), R.snrDB);
+        if isfinite(R.lag) && R.lag > 0.5
+            s = sprintf('%s | MATLAB %.1f s behind', s, R.lag);
+        end
     case 'coasting'
         s = sprintf('%6.1f s | distance %5.2f m | (holding - no fresh echo)', ...
             R.t, R.rTrack);
