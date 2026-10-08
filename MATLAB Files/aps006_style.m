@@ -12,6 +12,7 @@ function st = aps006_style()
 %   noise   "Rep: Noise Level", STD_NOISE x NTM - cyan horizontal line
 %   diff    a phase-2-minus-background difference, which can go negative
 %   sdDiff  the same difference taken on the SD across frames, not the mean
+%   iqDiff  the complex (I/Q) difference, |phase 2 - background|
 %   zero    a neutral reference line (zero amplitude, or zero taps)
 %
 % Change a value here and every figure in the pipeline follows. If you change
@@ -49,6 +50,9 @@ st.diffWidth    = 1.3;                % for one of the two phase traces
 
 st.sdDiffColour = [0 0.5 0];          % dark green, so the SD difference is
                                       % never read as the purple mean one
+
+st.iqDiffColour = [0.85 0.33 0.1];    % orange: the complex (I/Q) difference,
+                                      % as cir_phase_analysis_iq draws it
 
 st.controlColour = [0.35 0.35 0.35];  % the empty-room control difference,
 st.controlStyle  = '--';              % dashed and grey: a floor, not a signal

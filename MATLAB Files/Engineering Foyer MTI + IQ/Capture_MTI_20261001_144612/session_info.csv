@@ -1,0 +1,2 @@
+run_stamp,port,baud,separation_m,tap_to_metres,mti_mode,clutter_alpha,learn_seconds,settle_seconds,max_range_m
+20261001_144612,COM4,921600,1,0.30028,clutter,0.02,10,3,3.5

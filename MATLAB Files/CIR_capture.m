@@ -37,6 +37,11 @@
 %   taps_from_fp      sample - FP_INDEX, i.e. taps relative to the first path
 %   amplitude         |I+jQ|, raw accumulator magnitude
 %   amplitude_norm    amplitude / RXPACC
+%   real, imag        raw accumulator I and Q. cir_phase_analysis.m needs
+%                     these for its complex (I/Q) subtraction; they go on
+%                     the end, in the same order cir_iq_capture.m writes
+%                     them, so readers of the first four columns are
+%                     unaffected.
 %
 % This stage is deliberately on a raw tap axis only: no ranging, no distance
 % conversion, no reflector geometry. The question it answers is simply
@@ -308,9 +313,12 @@ for k = ks
     % ---- Save the aligned frame into the aligned subdirectory ------------
     % sample is kept purely for traceability: with no raw file written any
     % more, it is the only way back to the accumulator index when a frame
-    % looks wrong.
+    % looks wrong. data columns are sample, real, imag, amplitude,
+    % amplitude_norm, as the anchor prints them.
     alignedT = table(data(:,1), tapsFromFP, data(:,4), data(:,5), ...
-        'VariableNames', {'sample','taps_from_fp','amplitude','amplitude_norm'});
+        data(:,2), data(:,3), ...
+        'VariableNames', {'sample','taps_from_fp','amplitude','amplitude_norm', ...
+                          'real','imag'});
     alignedName = sprintf('frame_%04d_aligned.csv', k);
     writetable(alignedT, fullfile(alignedDir, alignedName));
 

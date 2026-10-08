@@ -26,11 +26,24 @@ function out = cir_phase_analysis(captureDir, varargin)
 % across frames. Both are differenced, phase 2 minus background, so there are
 % two detection traces - a change in level and a change in spread - and both
 % are also put on a distance axis, measured out from the tag-anchor midpoint.
-% On the figure, the four difference panels show negative values as zero.
-% The CSVs and the returned struct still hold the signed differences.
+% On the figure, the mean and SD difference panels show negative values as
+% zero. The CSVs and the returned struct still hold the signed differences.
+%
+% The third detection trace is the complex (I/Q) subtraction, ported from
+% the MTI code in MATLAB Files2 (mti_step.m and cir_phase_analysis_iq.m).
+% Every frame's I/Q is put on the same grid, nudged by up to +/-0.75 tap so
+% its direct path lines up with the first background frame's, and divided
+% by its own complex direct-path gain. That removes the random carrier phase
+% between the two free-running modules, so the static scene is the same
+% complex value frame to frame and can be averaged coherently. The trace is
+% |complex mean(phase 2) - complex mean(background)|, which is never
+% negative. It needs the real and imag columns in the aligned CSVs, which
+% CIR_capture.m and cir_iq_capture.m both write; older captures have none,
+% and their I/Q column is left empty rather than failing the run.
 %
 % Name-value options:
-%   'Plot'           true    draw and save the six-panel figure
+%   'Plot'           true    draw and save the eight-panel figure and the
+%                            three-panel distance summary
 %   'ShowSD'         true    shade +/- 1 SD across frames on the phase panels
 %   'MinFrameFrac'   0.8     a grid point is only averaged where at least this
 %                            fraction of the phase's frames reach it. FP_INDEX
@@ -52,13 +65,18 @@ function out = cir_phase_analysis(captureDir, varargin)
 %   cir_mean_background.csv   taps_from_fp, amplitude_norm_mean,
 %   cir_mean_phase2.csv       amplitude_norm_sd, n_frames
 %   cir_diff.csv              phase 2 mean minus background mean, phase 2 SD
-%                             minus background SD, and each tap's distance
-%                             from the tag-anchor midpoint
-%   cir_mean_variance_plot.png / .fig
+%                             minus background SD, each tap's distance from
+%                             the tag-anchor midpoint, and the complex
+%                             difference with both phases' |complex mean|
+%                             (NaN when the capture has no I/Q)
+%   cir_mean_variance_plot.png / .fig   both phases, and every method on
+%                                       taps and on distance (2 x 4)
+%   cir_distance_summary.png / .fig     just the three methods on distance
+%                                       (1 x 3), the bottom row of the above
 %
-% Returns a struct with the grid, both phase means, both differences, the
-% distance axis and the frame counts, so cir_compare_trial.m can reuse it
-% without re-reading CSVs.
+% Returns a struct with the grid, both phase means, all three differences,
+% the distance axis and the frame counts, so cir_compare_trial.m can reuse
+% it without re-reading CSVs.
 %
 % See also CIR_COMPARE_TRIAL, CIR_MULTI_TRIAL, CIR_TAPS_TO_DISTANCE,
 %          PLOT_CIR_APS006.
@@ -140,8 +158,15 @@ end
 % so that the two can never drift apart.
 gTaps = (-S.taps_before_fp : S.mean_grid_step : S.taps_after_fp)';
 
-bg = local_phase_average(captureDir, M(isBg, :), gTaps, S, 'background', opt);
-p2 = local_phase_average(captureDir, M(isP2, :), gTaps, S, 'phase2',     opt);
+[bg, bgIQ] = local_phase_average(captureDir, M(isBg, :), gTaps, S, 'background', opt);
+[p2, p2IQ] = local_phase_average(captureDir, M(isP2, :), gTaps, S, 'phase2',     opt);
+
+% ---- Complex (I/Q) subtraction -------------------------------------------
+% The same frames, kept as I/Q instead of reduced to magnitude. Background
+% frames go first, so the first of them is the reference every frame is
+% aligned and phase-normalised against.
+iq = local_complex_chain(bgIQ, p2IQ, gTaps, opt);
+clear bgIQ p2IQ
 
 % ---- Difference ----------------------------------------------------------
 % Non-coherent magnitudes, so this is a change in reflected energy per tap,
@@ -168,11 +193,13 @@ p2T = table(gTaps, p2.mu, p2.sd, p2.nPer, 'VariableNames', ...
 % New columns go on the end, so anything reading the old ones by name or by
 % position is unaffected.
 dT  = table(gTaps, dAmp, bg.mu, p2.mu, bg.nPer, p2.nPer, ...
-    dSd, bg.sd, p2.sd, distM, 'VariableNames', ...
+    dSd, bg.sd, p2.sd, distM, iq.diff, abs(iq.bgMean), abs(iq.p2Mean), ...
+    'VariableNames', ...
     {'taps_from_fp','amplitude_norm_diff','background_mean','phase2_mean', ...
      'n_background','n_phase2', ...
      'amplitude_norm_sd_diff','background_sd','phase2_sd', ...
-     'distance_from_midpoint_m'});
+     'distance_from_midpoint_m', ...
+     'iq_diff','iq_background_abs','iq_phase2_abs'});
 
 writetable(bgT, fullfile(captureDir, 'cir_mean_background.csv'));
 writetable(p2T, fullfile(captureDir, 'cir_mean_phase2.csv'));
@@ -191,6 +218,8 @@ out.background = bg;
 out.phase2     = p2;
 out.diff       = dAmp;
 out.sdDiff     = dSd;
+out.iq         = iq;
+out.iqDiff     = iq.diff;
 out.distM      = distM;
 out.counts     = struct('background', sum(isBg), 'discarded', sum(isWalk), ...
                         'phase2', sum(isP2), 'total', height(M));
@@ -198,9 +227,15 @@ out.counts     = struct('background', sum(isBg), 'discarded', sum(isWalk), ...
 % ---- Figure --------------------------------------------------------------
 if opt.Plot
     out.fig = local_plot(out, logical(opt.ShowSD));
-    % Named for what is on it: the mean difference and the spread (SD)
-    % difference side by side.
+    % Named for the mean and spread (SD) differences it started with. It
+    % keeps the name now the complex difference sits beside them, so a
+    % re-run replaces the old figure instead of leaving it next to the new.
     saved = local_save_figure(out.fig, captureDir, {'cir_mean_variance_plot'});
+
+    % The summary: the three distance panels on their own.
+    out.distFig = local_plot_distance(out);
+    saved = [saved, local_save_figure(out.distFig, captureDir, ...
+        {'cir_distance_summary'})];
     if opt.Verbose && ~isempty(saved)
         fprintf('Saved %s\n', strjoin(saved, ', '));
     end
@@ -260,17 +295,21 @@ delete(tmp.png, tmp.fig);
 end
 
 % =========================================================================
-function ph = local_phase_average(captureDir, Mp, gTaps, S, name, opt)
+function [ph, iqFrames] = local_phase_average(captureDir, Mp, gTaps, S, name, opt)
 %LOCAL_PHASE_AVERAGE  Non-coherent average of one phase's frames.
 %
 % Each frame is resampled onto the shared taps-from-FP grid before averaging,
 % because FP_INDEX is fractional and differs frame to frame. Magnitudes are
-% averaged, never I/Q: the carrier phase of every path rotates between
-% frames, so a coherent average would cancel real energy.
+% averaged here, never raw I/Q: the carrier phase of every path rotates
+% between frames, so a coherent average would cancel real energy. The I/Q
+% is handed back untouched in iqFrames (one cell per frame used, [] where
+% the CSV has none) for local_complex_chain, which removes that rotation
+% first.
 
 verbose  = opt.Verbose;
 nWanted  = height(Mp);
 ampGrid  = nan(numel(gTaps), nWanted);
+iqFrames = cell(1, nWanted);
 nUsed    = 0;
 nMissing = 0;
 
@@ -292,8 +331,10 @@ for i = 1:nWanted
     end
     nUsed = nUsed + 1;
     ampGrid(:, nUsed) = interp1(uTaps, T.amplitude_norm(ia), gTaps, 'linear', NaN);
+    iqFrames{nUsed}   = local_frame_iq(T, Mp, i);
 end
-ampGrid = ampGrid(:, 1:nUsed);
+ampGrid  = ampGrid(:, 1:nUsed);
+iqFrames = iqFrames(1:nUsed);
 
 if nUsed == 0
     error('Phase "%s" has no readable aligned frame CSVs in %s', name, captureDir);
@@ -338,6 +379,202 @@ if verbose
     end
     fprintf('.\n');
 end
+end
+
+% =========================================================================
+function fr = local_frame_iq(T, Mp, i)
+%LOCAL_FRAME_IQ  One aligned frame's I/Q on its own taps, or [] if it has none.
+%
+% Divided by RXPACC, the same scaling as amplitude_norm, so the complex
+% trace lands on the same y axis as the mean one. Captures from before
+% CIR_capture.m kept the real and imag columns have neither, and get [].
+fr = [];
+if ~all(ismember({'real','imag'}, T.Properties.VariableNames)), return; end
+acc = 1;
+if ismember('RXPACC', Mp.Properties.VariableNames) && Mp.RXPACC(i) > 0
+    acc = Mp.RXPACC(i);
+end
+[taps, ia] = unique(T.taps_from_fp);
+x  = complex(T.real(ia), T.imag(ia)) / acc;
+ok = isfinite(taps) & isfinite(x);
+fr = struct('taps', taps(ok), 'x', x(ok));
+end
+
+% =========================================================================
+function iq = local_complex_chain(bgFrames, p2Frames, gTaps, opt)
+%LOCAL_COMPLEX_CHAIN  Complex (I/Q) subtraction, phase 2 against background.
+%
+% Ported from MATLAB Files2: the per-frame alignment and normalisation are
+% steps 1-2 of mti_step.m, and the averaging and subtraction are
+% cir_phase_analysis_iq.m's complex method. Per frame:
+%
+%   1. spline the I/Q onto the grid, nudged by up to +/-0.75 tap so the
+%      direct path's shape lines up with the reference frame's. FP_INDEX
+%      jitters by a fraction of a tap, and on the steep edge of the direct
+%      path that jitter alone would look like a change.
+%   2. divide by the frame's least-squares complex gain against the
+%      reference over the direct-path window. The tag and anchor run on
+%      separate crystals, so every frame arrives with a random carrier phase
+%      (and its own AGC gain); this makes the direct path identical in every
+%      frame, after which the static scene is too and can be averaged
+%      coherently.
+%
+% The reference is the first usable frame, rotated so its direct-path peak
+% is real and positive - always a background frame, since those come first.
+% Each phase is then averaged as complex numbers, with the same MinFrameFrac
+% coverage rule as the magnitudes, and the result is the length of the
+% difference, |mean(phase 2) - mean(background)|. Where an echo lands on a
+% tap that already holds a static path, the magnitude difference depends on
+% the angle between the two and can cancel; this does not.
+%
+% Step 2 scales every frame to the reference frame's gain, so the result is
+% multiplied back by the mean |gain| of the frames used, which puts it on
+% the same amplitude/RXPACC scale as the mean difference.
+% cir_phase_analysis_iq takes that mean over the walking frames as well, so
+% its curve can differ from this one by that one scale factor.
+
+% Settings, as mti_config.m sets them.
+C = struct('DirectWindow', [-3 8], ...        % taps: where the direct path lives
+           'PeakWindow',   [0 8], ...         % taps: where its peak is looked for
+           'FineAlignMaxTaps', 0.75, ...
+           'FineAlignStep',    0.05);
+
+nG = numel(gTaps);
+iq = struct('available', false, 'bgMean', nan(nG,1), 'p2Mean', nan(nG,1), ...
+            'diff', nan(nG,1), 'nBackground', 0, 'nPhase2', 0, ...
+            'shift', [], 'gain', [], 'scale', NaN);
+
+frames = [bgFrames, p2Frames];
+isBg   = [true(1, numel(bgFrames)), false(1, numel(p2Frames))];
+nF     = numel(frames);
+dirIdx = find(gTaps >= C.DirectWindow(1) & gTaps <= C.DirectWindow(2));
+pkMask = gTaps >= C.PeakWindow(1) & gTaps <= C.PeakWindow(2);
+
+Y     = nan(nG, nF);
+gain  = nan(1, nF);
+shift = nan(1, nF);
+refX  = [];
+for k = 1:nF
+    fr = frames{k};
+    if isempty(fr) || numel(fr.taps) < 4, continue; end
+    ppRe = spline(fr.taps, real(fr.x));
+    ppIm = spline(fr.taps, imag(fr.x));
+
+    if isempty(refX)
+        xg = local_eval_iq(ppRe, ppIm, gTaps, fr.taps);
+        xg(~isfinite(xg)) = 0;
+        mag = abs(xg);
+        mag(~pkMask) = -Inf;
+        [pk, j] = max(mag);
+        if ~(pk > 0), continue; end
+        refX = xg * conj(xg(j)) / abs(xg(j));
+    end
+
+    s  = local_fine_shift(refX, dirIdx, gTaps, ppRe, ppIm, C);
+    xg = local_eval_iq(ppRe, ppIm, gTaps + s, fr.taps);
+    ok = isfinite(xg(dirIdx));
+    if ~any(ok), continue; end
+    ref = refX(dirIdx(ok));
+    g   = (ref' * xg(dirIdx(ok))) / (ref' * ref);
+    if ~isfinite(g) || g == 0, continue; end
+
+    Y(:, k)  = xg / g;            % NaN outside this frame's window stays NaN
+    gain(k)  = g;
+    shift(k) = s;
+end
+
+used = isfinite(gain);
+if ~any(used & isBg) || ~any(used & ~isBg)
+    if opt.Verbose
+        if all(cellfun(@isempty, frames))
+            fprintf(['  complex: no real/imag columns in the aligned CSVs (recorded ' ...
+                     'before CIR_capture.m kept I/Q), so the I/Q column is left empty.\n']);
+        else
+            fprintf(['  complex: %d background and %d phase2 frame(s) with usable ' ...
+                     'I/Q - need both, so the I/Q column is left empty.\n'], ...
+                sum(used & isBg), sum(used & ~isBg));
+        end
+    end
+    return
+end
+
+iq.scale = mean(abs(gain(used)));
+Y = Y * iq.scale;
+
+[iq.bgMean, iq.nBackground] = local_complex_mean(Y(:, used &  isBg), opt.MinFrameFrac);
+[iq.p2Mean, iq.nPhase2]     = local_complex_mean(Y(:, used & ~isBg), opt.MinFrameFrac);
+iq.diff      = abs(iq.p2Mean - iq.bgMean);
+iq.shift     = shift(used);
+iq.gain      = gain(used);
+iq.available = true;
+
+if opt.Verbose
+    fprintf(['  complex: aligned and phase-normalised %d background and %d ' ...
+             'phase2 frame(s) (sub-tap shifts %+.2f to %+.2f)'], ...
+        iq.nBackground, iq.nPhase2, min(iq.shift), max(iq.shift));
+    if nF > sum(used)
+        fprintf('; skipped %d without usable I/Q', nF - sum(used));
+    end
+    fprintf('.\n');
+end
+end
+
+% =========================================================================
+function xg = local_eval_iq(ppRe, ppIm, q, taps)
+%LOCAL_EVAL_IQ  The splined I/Q at q, NaN outside the frame's own taps.
+xg = nan(size(q));
+in = q >= taps(1) & q <= taps(end);
+xg(in) = complex(ppval(ppRe, q(in)), ppval(ppIm, q(in)));
+end
+
+% =========================================================================
+function s = local_fine_shift(refX, dirIdx, gTaps, ppRe, ppIm, C)
+%LOCAL_FINE_SHIFT  Sub-tap shift that lines this frame's direct path up with the reference.
+%
+% mti_step.m's local_fine_shift: normalised correlation of the direct
+% path's magnitude, so the frame's gain does not matter, over +/-
+% FineAlignMaxTaps in FineAlignStep steps, then a parabola through the best
+% step and its neighbours.
+q0     = gTaps(dirIdx);
+refMag = abs(refX(dirIdx));
+refMag = refMag - mean(refMag);
+shifts = -C.FineAlignMaxTaps : C.FineAlignStep : C.FineAlignMaxTaps;
+score  = -inf(size(shifts));
+lo = ppRe.breaks(1); hi = ppRe.breaks(end);
+for k = 1:numel(shifts)
+    q = q0 + shifts(k);
+    if q(1) < lo || q(end) > hi, continue; end
+    m = abs(complex(ppval(ppRe, q), ppval(ppIm, q)));
+    m = m - mean(m);
+    den = norm(m) * norm(refMag);
+    if den > 0, score(k) = (m' * refMag) / den; end
+end
+s = 0;
+[best, j] = max(score);
+if ~isfinite(best), return; end
+s = shifts(j);
+if j > 1 && j < numel(shifts) && all(isfinite(score(j-1:j+1)))
+    a = score(j-1); b = score(j); c = score(j+1);
+    den = a - 2*b + c;
+    if den < 0
+        s = s + 0.5 * (a - c) / den * C.FineAlignStep;
+    end
+end
+end
+
+% =========================================================================
+function [mu, nUsed] = local_complex_mean(Y, minFrameFrac)
+%LOCAL_COMPLEX_MEAN  Complex mean over frames, with the magnitudes' coverage rule.
+%
+% A grid point reached by fewer than MinFrameFrac of the frames comes out
+% NaN, exactly as in local_phase_average, so the complex trace drops the
+% same under-covered taps at the ends of the grid.
+nUsed = size(Y, 2);
+ok    = isfinite(Y);
+nPer  = sum(ok, 2);
+Y(~ok) = 0;
+mu = sum(Y, 2) ./ max(nPer, 1);
+mu(nPer == 0 | nPer < ceil(minFrameFrac * nUsed)) = NaN;
 end
 
 % =========================================================================
@@ -508,32 +745,26 @@ end
 
 % =========================================================================
 function fig = local_plot(R, showSD)
-%LOCAL_PLOT  Both phases and both differences, drawn like APS006 Figure 1.
+%LOCAL_PLOT  Both phases and all three differences, drawn like APS006 Figure 1.
 %
 % Same instrument as plot_cir_aps006.m: blue asterisk-marked trace, red
 % first-path line, filled black diamond on the peak, cyan noise level,
 % dashed black grid. Every value comes from aps006_style so the single-frame
-% figure and these six panels cannot drift apart.
+% figure and these eight panels cannot drift apart.
 %
-% The left column is the mean method and the right column the SD method:
+% The left column is the two phases; each column after it is one method,
+% on taps above and on distance below:
 %
-%   row 1   background mean CIR           phase 2 mean CIR
-%   row 2   mean difference vs taps       SD difference vs taps
-%   row 3   mean difference vs distance   SD difference vs distance
+%            phases         mean method      SD method        complex (I/Q)
+%   row 1    background     diff vs taps     diff vs taps     diff vs taps
+%   row 2    phase 2        diff vs dist     diff vs dist     diff vs dist
+%
+% tiledlayout numbers tiles along the rows, so row 1 is tiles 1-4 and
+% row 2 is tiles 5-8.
 st  = aps006_style();
-fig = figure('Color', st.figureColour, 'Position', [60 40 1500 1000]);
-tl  = tiledlayout(fig, 3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-
-ttl = 'CIR by phase';
-if strlength(R.session.run_label) > 0
-    ttl = sprintf('%s  -  %s', ttl, R.session.run_label);
-end
-% Interpreter none: run labels are full of underscores, and TeX would turn
-% trial1_human_2m_los into subscripts.
-title(tl, ttl, 'FontSize', st.labelFontSize + 1, 'FontWeight', 'bold', ...
-    'Interpreter', 'none');
-
-axList = gobjects(6,1);
+fig = figure('Color', st.figureColour, 'Position', [20 40 1880 840]);
+tl  = tiledlayout(fig, 2, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
+local_figure_title(tl, 'CIR by phase', R, st);
 
 % One y-range for both phase panels. Two panels meant to be compared by eye
 % cannot be on scales that differ by however much autoscaling felt like - a
@@ -542,78 +773,168 @@ axList = gobjects(6,1);
 % off the trace clips instead of flattening the CIR against the axis.
 yr = local_y_range({R.background, R.phase2}, showSD, st);
 
-axList(1) = local_phase_panel(tl, R.gTaps, R.background, st, showSD, yr, ...
+tapAx = local_phase_panel(tl, 1, R.gTaps, R.background, st, showSD, yr, ...
     sprintf('Background (n = %d frames)', R.background.nFrames));
-axList(2) = local_phase_panel(tl, R.gTaps, R.phase2, st, showSD, yr, ...
+tapAx(end+1) = local_phase_panel(tl, 5, R.gTaps, R.phase2, st, showSD, yr, ...
     sprintf('Phase 2, target present (n = %d frames)', R.phase2.nFrames));
 
 % ---- Negative differences zeroed -----------------------------------------
-% All four difference panels plot the frame-averaged difference with every
-% negative tap set to 0, so only taps where phase 2 rose above the
+% The mean and SD difference panels plot the frame-averaged difference with
+% every negative tap set to 0, so only taps where phase 2 rose above the
 % background are left standing. This is applied here, on the plotted copy,
 % only: out.diff, out.sdDiff and cir_diff.csv keep the signed values, and
-% cir_compare_trial / cir_multi_trial read those.
+% cir_compare_trial / cir_multi_trial read those. The complex difference is
+% a length, |phase 2 - background|, so it has no negatives to zero.
+% local_distance_row zeroes the same way for the distance panels.
 diffPos   = local_zero_negative(R.diff);
 sdDiffPos = local_zero_negative(R.sdDiff);
 
-% ---- Differences on the tap axis -----------------------------------------
+% ---- Differences on the tap axis (row 1) ---------------------------------
 tapRange = [min(R.gTaps) max(R.gTaps)];
 tapMarks = local_marker_indices(R.gTaps);
+iqL      = local_iq_labels(st);
 
-axList(3) = local_diff_panel(tl, R.gTaps, diffPos, tapRange, tapMarks, st, ...
+tapAx(end+1) = local_diff_panel(tl, 2, R.gTaps, diffPos, tapRange, tapMarks, st, ...
     st.diffColour, 'Phase 2 - Background', ...
-    'Difference (Phase 2 - Background)', ...
+    'Mean Difference (Phase 2 - Background)', ...
     st.xLabelFP, ['\Delta ' st.yLabelNorm], 'Peak @ %+g');
-axList(4) = local_diff_panel(tl, R.gTaps, sdDiffPos, tapRange, tapMarks, st, ...
+tapAx(end+1) = local_diff_panel(tl, 3, R.gTaps, sdDiffPos, tapRange, tapMarks, st, ...
     st.sdDiffColour, 'Phase 2 SD - Background SD', ...
     'SD Difference (Phase 2 - Background)', ...
     st.xLabelFP, ['\Delta SD ' st.yLabelNorm], 'Peak @ %+g');
 
-% ---- The same two differences on distance --------------------------------
-% Only taps >= 0 have a distance: nothing reflected arrives before the first
-% path. The markers are still picked on the tap grid, so each asterisk here
-% is the same sample as one on the tap panel above it, and the spacing
-% between them shows how the distance axis stretches near the first path.
+if R.iq.available
+    tapAx(end+1) = local_diff_panel(tl, 4, R.gTaps, R.iqDiff, tapRange, ...
+        tapMarks, st, st.iqDiffColour, iqL.trace, iqL.tapTitle, ...
+        st.xLabelFP, iqL.yLabel, 'Peak @ %+g');
+else
+    local_empty_panel(tl, 4, st, tapRange, iqL.tapTitle, st.xLabelFP, ...
+        iqL.yLabel, iqL.none);
+end
+
+% ---- The same three differences on distance (row 2) ----------------------
+local_distance_row(tl, [6 7 8], R, st);
+
+% Link only panels that share an axis. Distance is not a linear function of
+% taps, so a tap panel and a distance panel zoomed "together" would be
+% showing different stretches of the channel. local_distance_row links its
+% own three.
+linkaxes(tapAx, 'x');
+xlim(tapAx(1), tapRange);
+end
+
+% =========================================================================
+function fig = local_plot_distance(R)
+%LOCAL_PLOT_DISTANCE  The summary: just the three distance panels, 1 x 3.
+%
+% The bottom row of local_plot without the rest - mean, SD and I/Q
+% difference against distance from the tag-anchor midpoint - drawn by the
+% same local_distance_row, so the two figures always show the same panels.
+st  = aps006_style();
+fig = figure('Color', st.figureColour, 'Position', [40 80 1650 540]);
+tl  = tiledlayout(fig, 1, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
+local_figure_title(tl, 'Difference vs distance', R, st);
+local_distance_row(tl, 1:3, R, st);
+end
+
+% =========================================================================
+function distAx = local_distance_row(tl, tiles, R, st)
+%LOCAL_DISTANCE_ROW  Mean, SD and I/Q differences against distance, in tiles(1:3).
+%
+% Shared by both figures. Only taps >= 0 have a distance: nothing reflected
+% arrives before the first path. The markers are still picked on the tap
+% grid, so each asterisk is the same sample as one on the matching tap
+% panel, and the spacing between them shows how the distance axis
+% stretches near the first path. Negatives in the mean and SD differences
+% are zeroed, as on the tap panels.
 fwd       = R.gTaps >= 0;
 distX     = R.distM(fwd);
 distRange = [0 max(distX)];
 distMarks = local_marker_indices(R.gTaps(fwd));
 distSub   = sprintf('Tag-anchor separation D = %.2f m', ...
     R.session.tag_anchor_dist_m);
+diffPos   = local_zero_negative(R.diff);
+sdDiffPos = local_zero_negative(R.sdDiff);
+iqL       = local_iq_labels(st);
 
-axList(5) = local_diff_panel(tl, distX, diffPos(fwd), distRange, distMarks, ...
-    st, st.diffColour, 'Phase 2 - Background', ...
-    'Difference vs distance', ...
+distAx = local_diff_panel(tl, tiles(1), distX, diffPos(fwd), distRange, ...
+    distMarks, st, st.diffColour, 'Phase 2 - Background', ...
+    'Mean Difference vs distance', ...
     st.xLabelDist, ['\Delta ' st.yLabelNorm], 'Peak @ %.2f m');
-axList(6) = local_diff_panel(tl, distX, sdDiffPos(fwd), distRange, distMarks, ...
-    st, st.sdDiffColour, 'Phase 2 SD - Background SD', ...
+distAx(end+1) = local_diff_panel(tl, tiles(2), distX, sdDiffPos(fwd), distRange, ...
+    distMarks, st, st.sdDiffColour, 'Phase 2 SD - Background SD', ...
     'SD Difference vs distance', ...
     st.xLabelDist, ['\Delta SD ' st.yLabelNorm], 'Peak @ %.2f m');
-for ax = axList(5:6)'
+if R.iq.available
+    distAx(end+1) = local_diff_panel(tl, tiles(3), distX, R.iqDiff(fwd), ...
+        distRange, distMarks, st, st.iqDiffColour, iqL.trace, iqL.distTitle, ...
+        st.xLabelDist, iqL.yLabel, 'Peak @ %.2f m');
+    subAx = distAx;
+else
+    subAx = [distAx, local_empty_panel(tl, tiles(3), st, distRange, ...
+        iqL.distTitle, st.xLabelDist, iqL.yLabel, iqL.none)];
+end
+for ax = subAx
     subtitle(ax, distSub, 'FontSize', st.fontSize, 'FontWeight', 'normal');
 end
 
-% Link only panels that share an axis. Distance is not a linear function of
-% taps, so a tap panel and a distance panel zoomed "together" would be
-% showing different stretches of the channel.
-linkaxes(axList(1:4), 'x');
-linkaxes(axList(5:6), 'x');
-xlim(axList(1), tapRange);
-xlim(axList(5), distRange);
+linkaxes(distAx, 'x');
+xlim(distAx(1), distRange);
 end
 
 % =========================================================================
-function ax = local_diff_panel(tl, x, y, xr, mIdx, st, colour, traceName, ...
+function L = local_iq_labels(st)
+%LOCAL_IQ_LABELS  The I/Q panels' wording, shared by the tap and distance rows.
+L = struct();
+L.trace     = '|Phase 2 - Background| (I/Q)';
+L.tapTitle  = 'I/Q Difference |Phase 2 - Background|';
+L.distTitle = 'I/Q Difference vs distance';
+L.yLabel    = ['|\Delta I/Q| ' st.yLabelNorm];
+L.none      = {'No I/Q in this capture', ...
+               '(recorded before CIR\_capture.m kept real/imag)'};
+end
+
+% =========================================================================
+function local_figure_title(tl, ttl, R, st)
+%LOCAL_FIGURE_TITLE  Figure title, with the run label after it when there is one.
+if strlength(R.session.run_label) > 0
+    ttl = sprintf('%s  -  %s', ttl, R.session.run_label);
+end
+% Interpreter none: run labels are full of underscores, and TeX would turn
+% trial1_human_2m_los into subscripts.
+title(tl, ttl, 'FontSize', st.labelFontSize + 1, 'FontWeight', 'bold', ...
+    'Interpreter', 'none');
+end
+
+% =========================================================================
+function ax = local_empty_panel(tl, tile, st, xr, titleStr, xLabel, yLabel, msg)
+%LOCAL_EMPTY_PANEL  A labelled, empty difference panel with a note in the middle.
+%
+% Takes the I/Q panels' place for a capture with no I/Q, so the layout stays
+% the same for every capture and the gap explains itself.
+ax = nexttile(tl, tile);
+local_style_axes(ax, st);
+xlim(ax, xr);
+ylim(ax, [0 1]);
+text(ax, mean(xr), 0.5, msg, 'HorizontalAlignment', 'center', ...
+    'FontSize', st.labelFontSize, 'Color', st.zeroColour);
+xlabel(ax, xLabel, 'FontSize', st.labelFontSize);
+ylabel(ax, yLabel, 'FontSize', st.labelFontSize);
+title(ax, titleStr, 'FontSize', st.labelFontSize, 'FontWeight', 'normal');
+end
+
+% =========================================================================
+function ax = local_diff_panel(tl, tile, x, y, xr, mIdx, st, colour, traceName, ...
                                titleStr, xLabel, yLabel, peakFmt)
 %LOCAL_DIFF_PANEL  One phase-2-minus-background trace, on taps or distance.
 %
-% All four difference panels are drawn here so that they cannot drift
+% All six difference panels are drawn here so that they cannot drift
 % apart: grey zero line, red first-path line at x = 0 (tap 0 is the first
 % path, and it maps to 0 m), the trace in the asterisk style, and a filled
 % black diamond on the largest excursion either way. mIdx picks which points
 % get an asterisk, so a distance panel can mark the same samples as the tap
 % panel it pairs with.
-ax = nexttile(tl); hold(ax,'on');
+ax = nexttile(tl, tile); hold(ax,'on');
 plot(ax, xr, [0 0], '-', 'Color', st.zeroColour, 'LineWidth', st.zeroWidth);
 % cirWidth, not diffWidth: an asterisk drawn with a heavier stroke fills in
 % and reads as a dot, which would make this panel's marker look like a
@@ -650,7 +971,7 @@ legend(ax, [hD hF hP], 'Location', 'northeast', ...
 end
 
 % =========================================================================
-function ax = local_phase_panel(tl, gTaps, ph, st, showSD, yr, titleStr)
+function ax = local_phase_panel(tl, tile, gTaps, ph, st, showSD, yr, titleStr)
 %LOCAL_PHASE_PANEL  One averaged phase, drawn like the single-frame figure.
 %
 % The first path sits at taps_from_fp = 0 by construction, since every frame
@@ -658,7 +979,7 @@ function ax = local_phase_panel(tl, gTaps, ph, st, showSD, yr, titleStr)
 % than at FP_INDEX. The diamond marks the peak of the averaged trace; it is
 % deliberately labelled "Peak" and not "Rep:Peak", because the chip reports
 % Rep:Peak for one frame and never reported this.
-ax = nexttile(tl); hold(ax,'on');
+ax = nexttile(tl, tile); hold(ax,'on');
 
 hSD = gobjects(0);
 if showSD
@@ -708,6 +1029,8 @@ end
 local_style_axes(ax, st);
 xlim(ax, [min(gTaps) max(gTaps)]);
 ylim(ax, yr);   % fixed before anything else can rescale it
+% Labelled, because the phase 2 panel shares a row with distance panels.
+xlabel(ax, st.xLabelFP, 'FontSize', st.labelFontSize);
 ylabel(ax, st.yLabelNorm, 'FontSize', st.labelFontSize);
 title(ax, titleStr, 'FontSize', st.labelFontSize, 'FontWeight', 'normal');
 
@@ -790,10 +1113,18 @@ end
 
 % =========================================================================
 function r = local_pad_range(v, st)
-%LOCAL_PAD_RANGE  Symmetric-ish limits for a trace that can go negative.
+%LOCAL_PAD_RANGE  Padded limits for a difference trace, always taking in zero.
+%
+% Zero is always in range, so the grey zero line is always on the panel -
+% the complex difference never reaches it, as it is a length and its floor
+% sits above zero. The top also leaves room for the legend: with four
+% columns the panels are narrow enough that a legend in the top-right
+% corner sat on echoes 10-25 taps out and hid the peak diamond.
+legendRoom = 0.3;
 v = v(isfinite(v));
 if isempty(v), r = [-1 1]; return; end
-lo = min(v); hi = max(v);
-pad = (st.headroom - 1) * max(hi - lo, eps);
-r = [lo - pad, hi + pad];
+lo = min(min(v), 0); hi = max(v);
+span = max(hi - lo, eps);
+pad  = (st.headroom - 1) * span;
+r = [lo - pad, hi + pad + legendRoom * span];
 end
