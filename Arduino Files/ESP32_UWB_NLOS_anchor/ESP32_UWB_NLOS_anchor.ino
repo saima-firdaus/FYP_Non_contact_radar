@@ -63,6 +63,7 @@ void setup() {
 
     Serial.println(F("# DW1000 CIR capture - initialising"));
 
+
     // Explicit SPI pins for the Makerfabs board (SCK, MISO, MOSI).
     SPI.begin(18, 19, 23);
 
