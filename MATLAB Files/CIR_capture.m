@@ -82,7 +82,7 @@ WALK_DURATION_S  = 10;          % break length; walk to your mark in this window
 % lands in session_info.csv so a folder full of timestamps is still readable
 % six weeks later. Examples: "trial1_human_2m_los", "control_empty".
 %RUN_LABEL        = "trial1_human_2m_los";
-RUN_LABEL        = "ch5_sep1m_d3m";
+RUN_LABEL        = "ch5_sep1.9m_d5m";
 
 % ---- Subdirectory names --------------------------------------------------
 % Change these if you prefer different labels. The numeric prefix just keeps
@@ -96,7 +96,7 @@ ALIGNED_SUBDIR   = '02_lde_aligned';
 % cir_phase_analysis.m uses it to turn taps into distance out from the
 % tag-anchor midpoint. Update it whenever you move the boards: a stale value
 % here puts every distance axis in the wrong place.
-TAG_ANCHOR_DIST_M = 1;
+TAG_ANCHOR_DIST_M = 1.9;
 
 % ---- Plot ----------------------------------------------------------------
 % The figure reproduces Figure 1 of Qorvo APS006 Part 3: one frame's CIR on
