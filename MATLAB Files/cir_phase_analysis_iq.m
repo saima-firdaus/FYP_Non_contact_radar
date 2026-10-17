@@ -1,5 +1,5 @@
 function out = cir_phase_analysis_iq(captureDir, varargin)
-%CIR_PHASE_ANALYSIS_IQ  Where you stood: CIR_capture's magnitude method vs complex I/Q, same frames.
+%CIR_PHASE_ANALYSIS_IQ  Where you stood: BSDA vs complex I/Q subtraction, same re-aligned frames.
 %
 %   out = CIR_PHASE_ANALYSIS_IQ(captureDir)
 %   out = CIR_PHASE_ANALYSIS_IQ(captureDir, 'TrueDistance', 1.5, ...)
@@ -8,41 +8,40 @@ function out = cir_phase_analysis_iq(captureDir, varargin)
 % For a static session recorded with cir_iq_capture (its serial_log.txt
 % keeps I and Q). The session is split exactly as in cir_phase_analysis2:
 % background before walk_prompt_at_s, the walking break thrown away,
-% phase 2 after it. The SAME frames then go through two chains:
+% phase 2 after it. The SAME frames then go through two methods:
 %
-%   Magnitude  what CIR_capture + cir_phase_analysis2 do: |I+jQ| / RXPACC on
-%              the FP-relative grid, mean of each phase, phase 2 minus
-%              background, negatives removed.
-%   Complex    what the MTI code does: I/Q on the same grid, refined by up
-%              to +/-0.75 tap against the direct-path shape, divided by the
-%              frame's own complex direct-path gain; then the complex mean of
-%              each phase and the size of their difference,
-%              |mean(phase 2) - mean(background)|.
+%   BSDA     cir_phase_analysis_variance's statistic: per tap, the SD of
+%            |I+jQ| / RXPACC across phase 2 minus its SD across the
+%            background, against the per-tap F threshold for Pfa. A still
+%            scene has no spread whatever its level, so this needs no phase
+%            reference and ignores slow drift.
+%   Complex  what the MTI code does: I/Q on the same grid, refined by up to
+%            +/-0.75 tap against the direct-path shape, divided by the
+%            frame's own complex direct-path gain; then the complex mean of
+%            each phase and the size of their difference,
+%            |mean(phase 2) - mean(background)|.
 %
-% Why they can differ. Where your echo p lands on a tap that already holds a
-% static reflection B, the magnitude method sees |B + p| - |B|, which is
-% about |p| x cos(angle between them): anything from +|p| down to -|p|, so
-% you can vanish or even show up as a dip. The complex method sees |p|
-% whatever the angle. Its costs: it also sees frame-to-frame phase jitter of
-% strong static paths (|B| x jitter), which the magnitude ignores; your own
-% breathing and sway rotate your echo and shrink its average; and a path you
-% block counts as a change too (a positive bump behind you, where the
-% magnitude method shows a dip it then clips).
+% Re-alignment. Every frame is put on the grid by FP_INDEX, which is where
+% the DW1000's leading-edge detector found the first path - and on the
+% directional-antenna PCB it locks onto different paths in different frames
+% (shifts of about 4 taps, in up to 90% of the frames), so each phase would
+% be averaged over a mix of misaligned frames. Before either method, each
+% frame's |CIR| is slid over +/-MaxShiftTaps against the empty room's median
+% shape and moved to the best match, its I/Q with it ('Realign', false
+% turns this off).
 %
-% Both use the same k0 (direct-path lead-edge-to-peak offset, taken from the
-% magnitude background like cir_phase_analysis2) and the same ellipse
-% geometry, so any difference in distance comes from the method alone.
+% Range zero (k0): the TALLEST point 0..15 taps after FP in the empty room,
+% the dominant path; every distance is measured from it. The target is
+% searched from SkipTaps past it - the direct path's own zone, where the
+% body disturbing strong early paths makes big changes that are not the
+% target - and from MinRangeM out.
 %
 % Figure (cir_iq_compare.png), top to bottom:
-%   1. background level (solid) and frame-to-frame scatter (dashed) of each
-%      method: the floor each one has to beat, tap by tap
-%   2. magnitude difference vs distance (cir_phase_analysis2's bottom panel)
-%   3. complex difference vs distance, same scale
-%   4. single-frame readings through phase 2 (what a tracker would see)
-% Dashed lines in 2 and 3 are per-tap thresholds with the same false-alarm
-% rate (NoiseSigmaK sigma), from the background frames' own scatter. The
-% dotted line in 2 is cir_phase_analysis2's threshold (3 sigma from the
-% negatives), for reference.
+%   1. background level (solid) and frame-to-frame scatter (dashed)
+%   2. BSDA: SD change vs distance, with its F threshold
+%   3. complex difference vs distance
+%   4. readings through phase 2: BSDA over a sliding BsdaWindowS window,
+%      complex from every frame on its own
 %
 % Options:
 %   'TrueDistance'   []     m from the modules' midpoint; default from
@@ -50,11 +49,15 @@ function out = cir_phase_analysis_iq(captureDir, varargin)
 %   'Separation'     []     m; default from session_info.csv, else 1
 %   'SettleSeconds'  0      drop frames before this (both methods)
 %   'WalkPromptAtS'  [], 'WalkDurationS' []   override session_info.csv
-%   'MinRangeM'      0.5    peaks are searched from here ...
-%   'MaxRangeM'      6      ... to here (cir_phase_analysis2's default)
-%   'NoiseSigmaK'    3
-%   'PeakOffsetTaps' []     force k0 (taps); default: max of the background
-%                           0..8 taps after FP, as cir_phase_analysis2
+%   'Realign'        true   re-align every frame by its shape
+%   'MaxShiftTaps'   5      largest shift the re-alignment tries
+%   'PeakOffsetTaps' []     force k0 (taps after FP)
+%   'SkipTaps'       3      the search starts this many taps past k0 ...
+%   'MinRangeM'      0.75   ... and this far out ...
+%   'MaxRangeM'      6      ... and stops here
+%   'Pfa'            1e-3   BSDA per-tap false-alarm probability
+%   'BsdaWindowS'    2      window of the BSDA readings through phase 2
+%   'NoiseSigmaK'    3      complex thresholds, in sigma
 %   'MinFrameFrac'   0.8    grid coverage rule, as cir_phase_analysis2
 %   'Plot'           true
 %   'Verbose'        true
@@ -72,9 +75,10 @@ if nargin < 1 || isempty(captureDir), captureDir = local_newest(pwd); end
 captureDir = char(captureDir);
 
 o = struct('TrueDistance', [], 'Separation', [], 'SettleSeconds', 0, ...
-           'WalkPromptAtS', [], 'WalkDurationS', [], 'MinRangeM', 0.5, ...
-           'MaxRangeM', 6, 'NoiseSigmaK', 3, 'PeakOffsetTaps', [], ...
-           'MinFrameFrac', 0.8, 'Plot', true, 'Verbose', true);
+           'WalkPromptAtS', [], 'WalkDurationS', [], 'Realign', true, ...
+           'MaxShiftTaps', 5, 'PeakOffsetTaps', [], 'SkipTaps', 3, ...
+           'MinRangeM', 0.75, 'MaxRangeM', 6, 'Pfa', 1e-3, 'BsdaWindowS', 2, ...
+           'NoiseSigmaK', 3, 'MinFrameFrac', 0.8, 'Plot', true, 'Verbose', true);
 names = fieldnames(o);
 for k = 1:2:numel(varargin)
     hit = find(strcmpi(names, varargin{k}), 1);
@@ -122,21 +126,18 @@ if all(isnan(el))
     error('The frames carry no elapsed_s: record with cir_iq_capture.');
 end
 
-% ---- Magnitude chain: exactly cir_phase_analysis2's per-frame step -------------
-Amag = nan(nG, nF);
-for i = 1:nF
-    f   = frames{i};
-    acc = 1;
-    if isfield(f.meta, 'RXPACC') && f.meta.RXPACC > 0, acc = f.meta.RXPACC; end
-    [u, ia] = unique(f.sample - f.meta.FP_INDEX);
-    a = hypot(f.re, f.im) / acc;                 % amplitude_norm
-    if numel(u) >= 2
-        Amag(:, i) = interp1(u, a(ia), g, 'linear', NaN);
-    end
+% ---- |I+jQ| / RXPACC on the FP grid, then shape re-alignment ------------------------
+Amag  = local_magnitudes(frames, g, zeros(1, nF));
+shift = zeros(1, nF);
+if o.Realign
+    bg0 = el >= o.SettleSeconds & el < walkAt & any(isfinite(Amag), 1);
+    shift = local_realign(Amag, g, bg0, o.MaxShiftTaps);
+    Amag  = local_magnitudes(frames, g, shift);       % again from the raw samples
 end
 
 % ---- Complex chain: the MTI's own mti_step, run without ever "finishing
-% learning", so each frame is only aligned and normalised --------------------------
+% learning", so each frame is only aligned and normalised. Each frame goes in
+% with FP_INDEX moved by its shape shift, so its I/Q lands where its |CIR| did.
 cfg = mti_config('Separation', sep, 'TapToMetres', t2m, 'TapsBeforeFP', tb, ...
                  'TapsAfterFP', ta, 'GridStep', step, 'SettleSeconds', 0, ...
                  'LearnSeconds', 1e9);
@@ -144,7 +145,9 @@ S = mti_init(cfg);
 Y = nan(nG, nF);
 gainAbs = nan(1, nF);
 for i = find(el >= o.SettleSeconds)
-    [S, R] = mti_step(S, frames{i});
+    f = frames{i};
+    f.meta.FP_INDEX = f.meta.FP_INDEX + shift(i);
+    [S, R] = mti_step(S, f);
     if isempty(R.y), continue; end
     y = R.y;
     y(~isfinite(R.xAligned)) = NaN;              % outside this frame's window
@@ -165,61 +168,68 @@ end
 
 % ---- Phase statistics ---------------------------------------------------------------
 [muB, sdB, nB] = local_stats(Amag(:, isBg), o.MinFrameFrac);
-[muP, ~,   nP] = local_stats(Amag(:, isP2), o.MinFrameFrac);
-dMag = muP - muB;
+[~,   sdP, nP] = local_stats(Amag(:, isP2), o.MinFrameFrac);
+dSD = sdP - sdB;
 [cB, vB, nCB]  = local_stats(Y(:, isBg), o.MinFrameFrac);
 [cP, ~,  nCP]  = local_stats(Y(:, isP2), o.MinFrameFrac);
 dIQ = abs(cP - cB);
 
 % ---- k0 and the distance axis (shared) ----------------------------------------------
-[k0auto, k0first] = local_k0(g, muB);
-k0 = k0auto;
+k0 = local_tallest(g, muB, 15);
 if ~isempty(o.PeakOffsetTaps), k0 = o.PeakOffsetTaps; end
 dist = mti_geometry('tap2range', g, cfg, k0);
-win  = isfinite(dist) & dist >= o.MinRangeM & dist <= o.MaxRangeM;
+win  = isfinite(dist) & dist >= o.MinRangeM & dist <= o.MaxRangeM & g >= k0 + o.SkipTaps;
+rStart = min(dist(win));
+if isempty(rStart), rStart = o.MinRangeM; end
 
 % ---- Thresholds ---------------------------------------------------------------------
+% BSDA: under "nothing changed at this tap" SD_p2^2 / SD_bg^2 is F(nP-1, nB-1)
+% distributed, so this is a constant-false-alarm threshold on the SD change
+% (cir_phase_analysis_variance). Complex: a length, |difference|, Rayleigh-
+% distributed when nothing changed, so the factor for the same false-alarm
+% rate as K sigma is sqrt(-ln(Pfa)) = 2.57 for K = 3.
 K = o.NoiseSigmaK;
-neg = dMag(isfinite(dMag) & dMag < 0);
-thrNeg = NaN;                                   % cir_phase_analysis2's line
-if numel(neg) >= 5, thrNeg = K * median(abs(neg)) / 0.6745; end
-% Per tap, from the background frames' scatter. The magnitude difference is
-% close to Gaussian (K sigma). The complex one is a length, |difference|,
-% Rayleigh-distributed when nothing changed, so the factor for the same
-% false-alarm rate is sqrt(-ln(Pfa)) = 2.57 for K = 3.
 fK = sqrt(-log(0.5 * erfc(K / sqrt(2))));
-thrMag = K  * sdB .* sqrt(1 ./ nB  + 1 ./ nP);
-thrIQ  = fK * sqrt(vB .* (1 ./ nCB + 1 ./ nCP));
+thrSD = sdB .* (sqrt(local_finv(1 - o.Pfa, nP - 1, nB - 1)) - 1);
+thrIQ = fK * sqrt(vB .* (1 ./ nCB + 1 ./ nCP));
 
 % ---- Averaged picks ---------------------------------------------------------------
-pm = local_pick(max(dMag, 0), thrMag, dist, win);
+pb = local_pick(max(dSD, 0), thrSD, dist, win);
 pc = local_pick(dIQ, thrIQ, dist, win);
 % Taps where the complex difference is big but it is the static path itself
 % getting weaker, keeping its phase (the change points straight against the
 % background, within ~25 deg): most likely a path you are blocking, not your
 % echo. Your own echo cancelling part of a static path can also make a tap
-% weaker, but its change then points in some other direction. (The
-% magnitude method shows both as dips and clips them.)
+% weaker, but its change then points in some other direction.
 along = real((cP - cB) .* conj(cB)) ./ (abs(cP - cB) .* abs(cB));
 weaker = abs(cP) < abs(cB) & dIQ > thrIQ & along < -0.9;
 
-% ---- Single-frame readings through phase 2 ------------------------------------------
+% ---- Readings through phase 2 ---------------------------------------------------------
+% BSDA needs a spread, so it reads from a sliding window of the last
+% BsdaWindowS of phase-2 frames; complex reads every frame on its own.
 iP2 = find(isP2);
 nP2f = numel(iP2);
-readM = nan(1, nP2f); readC = nan(1, nP2f);
-% Detected on each tap's own scatter (sigma units), then placed on the top of
-% the difference itself, up to one tap away: where the scatter changes across
-% an echo (a static path beside it), the sigma-scaled peak sits off the echo.
+readB = nan(1, nP2f); readC = nan(1, nP2f);
+nWin = max(3, round(o.BsdaWindowS / median(diff(el(iP2)), 'omitnan')));
+thrW = sdB .* (sqrt(local_finv(1 - o.Pfa, (nWin - 1) * ones(nG, 1), nB - 1)) - 1);
+% Complex: detected on each tap's own scatter (sigma units), then placed on
+% the top of the difference itself, up to one tap away: where the scatter
+% changes across an echo (a static path beside it), the sigma-scaled peak
+% sits off the echo.
 climb = max(1, round(1 / step));
 for j = 1:nP2f
-    dM1 = Amag(:, iP2(j)) - muB;
+    if j >= nWin
+        vW = std(Amag(:, iP2(j - nWin + 1 : j)), 0, 2, 'omitnan') - sdB;
+        vW(~(vW > thrW)) = 0;                         % a reading needs a detection
+        a = local_pick(vW, thrW, dist, win);
+        readB(j) = a.strongR;
+    end
     dC1 = abs(Y(:, iP2(j)) - cB);                     % the MTI's statistic
-    a = local_pick(max(dM1 ./ sdB, 0), K  * ones(nG, 1), dist, win, max(dM1, 0), climb);
-    b = local_pick(dC1 ./ sqrt(vB),    fK * ones(nG, 1), dist, win, dC1, climb);
-    readM(j) = a.nearR;
+    b = local_pick(dC1 ./ sqrt(vB), fK * ones(nG, 1), dist, win, dC1, climb);
     readC(j) = b.nearR;
 end
-fm = local_frame_summary(readM, trueD);
+nWinRead = max(nP2f - nWin + 1, 0);                % full windows only
+fb = local_frame_summary(readB(nP2f - nWinRead + 1 : end), trueD);
 fc = local_frame_summary(readC, trueD);
 
 % ---- Scatter on the strong static taps: why one method has the lower floor ----------
@@ -229,8 +239,9 @@ scatM = median(sdB(strong) ./ muB(strong));
 scatC = median(sqrt(vB(strong)) ./ abs(cB(strong)));
 
 % ---- Report ---------------------------------------------------------------------------
+moved = abs(shift) >= 1.5 & use;
 if o.Verbose
-    fprintf('\n=== Magnitude vs complex I/Q: %s ===\n', captureDir);
+    fprintf('\n=== BSDA vs complex I/Q: %s ===\n', captureDir);
     if ~isempty(label), fprintf('Run label : %s\n', label); end
     fprintf(['Frames    : %d background (%.1f-%.1f s) | %d phase 2 ' ...
              '(%.1f-%.1f s), the same frames for both\n'], sum(isBg), ...
@@ -238,33 +249,45 @@ if o.Verbose
     if isfield(info, 'nBadFrames') && info.nBadFrames > 0
         fprintf('            (%d corrupted frames dropped first)\n', info.nBadFrames);
     end
-    fprintf('Geometry  : foci %g m apart, direct-path peak k0 = %+.2f taps', sep, k0);
-    if ~isempty(o.PeakOffsetTaps), fprintf(' (given)'); end
-    fprintf('\n');
-    if isempty(o.PeakOffsetTaps) && isfinite(k0first) && abs(k0first - k0auto) > 1
-        fprintf(['  NOTE: the strongest point 0-8 taps after FP is at %+.1f, but an ' ...
-                 'earlier peak within 6 dB sits at %+.1f.\n        If %+.1f is a ' ...
-                 'floor/ceiling bounce rather than the direct pulse, every distance ' ...
-                 'reads\n        about %.2f m short. Try ''PeakOffsetTaps'', %g.\n'], ...
-            k0auto, k0first, k0auto, local_shift_m(k0auto, k0first, trueD, cfg), k0first);
+    if o.Realign
+        fprintf('Re-aligned: %d of %d frames moved by 1.5 taps or more', sum(moved), sum(use));
+        if any(moved)
+            [u, ~, kk] = unique(round(shift(moved)));
+            cnt = accumarray(kk(:), 1);
+            fprintf(' (%s) - FP_INDEX locked on another path', ...
+                strjoin(arrayfun(@(a, n) sprintf('%+d taps x%d', a, n), u(:).', cnt(:).', ...
+                'UniformOutput', false), ', '));
+        end
+        fprintf('\n');
+    else
+        fprintf('Re-aligned: off (frames placed by FP_INDEX only)\n');
     end
+    fprintf('Geometry  : foci %g m apart, range zero k0 = %+.2f taps', sep, k0);
+    if ~isempty(o.PeakOffsetTaps)
+        fprintf(' (given)\n');
+    else
+        fprintf(' (tallest point 0-15 taps after FP)\n');
+    end
+    fprintf('            searching %.2f-%.2f m (from %g taps past k0)\n', rStart, ...
+        o.MaxRangeM, o.SkipTaps);
     if isfinite(trueD), fprintf('You stood : %.2f m\n', trueD); end
-    fprintf('\n%-34s %-24s %-24s\n', '', 'Magnitude (CIR_capture)', 'Complex I/Q (MTI chain)');
+    fprintf('\n%-34s %-24s %-24s\n', '', 'BSDA (SD change)', 'Complex I/Q (MTI chain)');
     fprintf('%-34s %-24s %-24s\n', 'Averaged: strongest peak', ...
-        local_peak_str(pm.strongR, pm.strongDB), local_peak_str(pc.strongR, pc.strongDB));
+        local_peak_str(pb.strongR, pb.strongDB), local_peak_str(pc.strongR, pc.strongDB));
     fprintf('%-34s %-24s %-24s\n', 'Averaged: nearest detection', ...
-        local_peak_str(pm.nearR, pm.nearDB), local_peak_str(pc.nearR, pc.nearDB));
+        local_peak_str(pb.nearR, pb.nearDB), local_peak_str(pc.nearR, pc.nearDB));
     if isfinite(trueD)
-        fprintf('%-34s %-24s %-24s\n', 'Averaged: error (nearest - true)', ...
-            local_err_str(pm.nearR - trueD), local_err_str(pc.nearR - trueD));
+        fprintf('%-34s %-24s %-24s\n', 'Averaged: error, strongest / nearest', ...
+            local_err2_str(pb, trueD), local_err2_str(pc, trueD));
     end
-    fprintf('%-34s %-24s %-24s\n', 'Single frames: detected', ...
-        sprintf('%.0f%% of %d', 100 * fm.hit, nP2f), sprintf('%.0f%% of %d', 100 * fc.hit, nP2f));
-    fprintf('%-34s %-24s %-24s\n', 'Single frames: median / spread', ...
-        local_ms_str(fm), local_ms_str(fc));
+    fprintf('%-34s %-24s %-24s\n', 'Readings: detected', ...
+        sprintf('%.0f%% of %d windows', 100 * fb.hit, nWinRead), ...
+        sprintf('%.0f%% of %d frames', 100 * fc.hit, nP2f));
+    fprintf('%-34s %-24s %-24s\n', 'Readings: median / spread', ...
+        local_ms_str(fb), local_ms_str(fc));
     if isfinite(trueD)
-        fprintf('%-34s %-24s %-24s\n', 'Single frames: RMS error', ...
-            local_err_str(fm.rms, true), local_err_str(fc.rms, true));
+        fprintf('%-34s %-24s %-24s\n', 'Readings: RMS error', ...
+            local_err_str(fb.rms, true), local_err_str(fc.rms, true));
     end
     for r = unique([pc.strongR pc.nearR])
         if ~isfinite(r), continue; end
@@ -280,37 +303,100 @@ if o.Verbose
         sprintf('%.1f%% (~%.0f deg)', 100 * scatC, rad2deg(scatC)));
     fprintf(['\n(dB = height of the peak over its own threshold: higher stands out ' ...
              'more, negative = under it.\n Nearest detection = the closest peak over ' ...
-             'threshold within 10 dB of the strongest, the rule\n cir_mti_live uses. ' ...
-             'Single frames = one frame against the background, no averaging: what the\n ' ...
-             'MTI sees.)\n']);
+             'threshold within 10 dB of the strongest. BSDA readings: SD over\n the ' ...
+             'last %d phase-2 frames (%g s) vs the background; complex readings: one ' ...
+             'frame vs the\n background, no averaging - what the MTI sees.)\n'], ...
+        nWin, o.BsdaWindowS);
 end
 
 % ---- Save --------------------------------------------------------------------------------
 fid = fopen(fullfile(captureDir, 'cir_iq_compare.csv'), 'w');
-fprintf(fid, ['taps_from_fp,offset_m,mag_bg_mean,mag_bg_sd,mag_p2_mean,mag_diff,' ...
-              'mag_threshold,iq_bg_abs,iq_bg_scatter,iq_p2_abs,iq_diff,iq_threshold\n']);
+fprintf(fid, ['taps_from_fp,offset_m,bg_mean,bg_sd,p2_sd,sd_diff,bsda_threshold,' ...
+              'iq_bg_abs,iq_bg_scatter,iq_p2_abs,iq_diff,iq_threshold\n']);
 fprintf(fid, '%.4f,%.4f,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g,%.6g\n', ...
-    [g dist muB sdB muP dMag thrMag abs(cB) sqrt(vB) abs(cP) dIQ thrIQ].');
+    [g dist muB sdB sdP dSD thrSD abs(cB) sqrt(vB) abs(cP) dIQ thrIQ].');
 fclose(fid);
 fid = fopen(fullfile(captureDir, 'cir_iq_frames.csv'), 'w');
-fprintf(fid, 'elapsed_s,magnitude_reading_m,complex_reading_m\n');
-fprintf(fid, '%.4f,%.4f,%.4f\n', [el(iP2); readM; readC]);
+fprintf(fid, 'elapsed_s,bsda_reading_m,complex_reading_m,shift_taps\n');
+fprintf(fid, '%.4f,%.4f,%.4f,%.3f\n', [el(iP2); readB; readC; shift(iP2)]);
 fclose(fid);
 
 out = struct('dir', captureDir, 'grid', g, 'distance', dist, 'k0', k0, ...
-    'separation', sep, 'trueDistance', trueD, ...
-    'magnitude', struct('bgMean', muB, 'bgSD', sdB, 'p2Mean', muP, 'diff', dMag, ...
-        'threshold', thrMag, 'thresholdNeg', thrNeg, 'pick', pm, ...
-        'frameReadings', readM, 'frames', fm, 'bgScatter', scatM), ...
+    'separation', sep, 'trueDistance', trueD, 'searchFromM', rStart, ...
+    'shift', shift, 'elapsed', el, ...
+    'bsda', struct('bgMean', muB, 'bgSD', sdB, 'p2SD', sdP, 'diff', dSD, ...
+        'threshold', thrSD, 'pick', pb, 'frameReadings', readB, 'frames', fb, ...
+        'windowFrames', nWin, 'bgScatter', scatM), ...
     'complex', struct('bgMean', cB, 'bgScatter2', vB, 'p2Mean', cP, 'diff', dIQ, ...
         'threshold', thrIQ, 'pick', pc, 'frameReadings', readC, 'frames', fc, ...
         'bgScatter', scatC, 'weaker', weaker), ...
     'frameTimes', el(iP2), 'counts', [sum(isBg) sum(isP2)]);
 
 if o.Plot
-    out.fig = local_plot(out, o, label, sum(isBg), sum(isP2));
+    out.fig = local_plot(out, o, label, sum(isBg), sum(isP2), sum(moved));
     print(out.fig, fullfile(captureDir, 'cir_iq_compare.png'), '-dpng', '-r150');
     if o.Verbose, fprintf('Saved cir_iq_compare.png, cir_iq_compare.csv, cir_iq_frames.csv\n'); end
+end
+end
+
+% =============================================================================
+function A = local_magnitudes(frames, g, shift)
+% |I+jQ| / RXPACC of every frame on the FP grid (amplitude_norm, as
+% CIR_capture saves it), each frame placed with FP_INDEX + shift.
+A = nan(numel(g), numel(frames));
+for i = 1:numel(frames)
+    f   = frames{i};
+    acc = 1;
+    if isfield(f.meta, 'RXPACC') && f.meta.RXPACC > 0, acc = f.meta.RXPACC; end
+    [u, ia] = unique(f.sample - (f.meta.FP_INDEX + shift(i)));
+    a = hypot(f.re, f.im) / acc;
+    if numel(u) >= 2
+        A(:, i) = interp1(u, a(ia), g, 'linear', NaN);
+    end
+end
+end
+
+% =============================================================================
+function shift = local_realign(A, g, isBg, maxShift)
+% Shift (taps) that lines each frame's |CIR| shape, -5..25 taps after FP, up
+% with the background's median shape: normalised correlation, so gain does
+% not matter, refined between grid steps. Two passes: the second against the
+% median of the background frames already moved by the first.
+step = g(2) - g(1);
+w    = find(g >= -5 & g <= 25);
+lags = round(-maxShift / step) : round(maxShift / step);
+nF   = size(A, 2);
+shift = zeros(1, nF);
+for pass = 1:2
+    B = A(:, isBg);
+    if pass == 2
+        ib = find(isBg);
+        for q = 1:numel(ib)
+            B(:, q) = interp1(g, A(:, ib(q)), g + shift(ib(q)), 'linear', NaN);
+        end
+    end
+    ref = median(B, 2, 'omitnan');
+    r0  = ref(w) - mean(ref(w), 'omitnan');
+    if any(~isfinite(r0)), return; end
+    for i = 1:nF
+        sc = -inf(size(lags));
+        for q = 1:numel(lags)
+            idx = w + lags(q);
+            if idx(1) < 1 || idx(end) > numel(g), continue; end
+            v = A(idx, i);
+            if any(~isfinite(v)), continue; end
+            v = v - mean(v);
+            sc(q) = (v' * r0) / (norm(v) * norm(r0) + eps);
+        end
+        [best, b] = max(sc);
+        if ~isfinite(best), shift(i) = 0; continue; end
+        d = 0;
+        if b > 1 && b < numel(lags) && all(isfinite(sc(b-1:b+1)))
+            den = sc(b-1) - 2 * sc(b) + sc(b+1);
+            if den < 0, d = 0.5 * (sc(b-1) - sc(b+1)) / den; end
+        end
+        shift(i) = (lags(b) + d) * step;
+    end
 end
 end
 
@@ -400,27 +486,30 @@ if isfinite(trueD), s.rms = sqrt(mean((r - trueD).^2)); end
 end
 
 % =============================================================================
-function [k, kFirst] = local_k0(g, mu)
-% cir_phase_analysis2's rule: the maximum of the background 0..8 taps after
-% FP. kFirst is the earliest local peak within 6 dB of it, to warn when the
-% maximum is probably a floor/ceiling bounce sitting on the pulse's tail.
-k = 0; kFirst = NaN;
-w = find(g >= 0 & g <= 8 & isfinite(mu));
+function k = local_tallest(g, mu, upto)
+% The dominant path: the largest background level 0..upto taps after FP,
+% refined between grid steps.
+k = 0;
+w = find(g >= 0 & g <= upto & isfinite(mu));
 if isempty(w), return; end
 [pk, j] = max(mu(w));
 if ~(pk > 0), return; end
-k = g(w(j));
-v = mu(w);
-if numel(v) < 3, kFirst = k; return; end
-isMax = [v(1) > v(2); v(2:end-1) >= v(1:end-2) & v(2:end-1) > v(3:end); v(end) > v(end-1)];
-c = find(isMax & v >= pk / 2, 1);
-if ~isempty(c), kFirst = g(w(c)); end
+j = w(j);
+k = g(j);
+if j > 1 && j < numel(mu) && all(isfinite(mu(j-1:j+1)))
+    a = mu(j-1); b = mu(j); c = mu(j+1); den = a - 2*b + c;
+    if den < 0, k = k + 0.5 * (a - c) / den * (g(2) - g(1)); end
+end
 end
 
-function d = local_shift_m(kA, kB, r, cfg)
-if ~isfinite(r), r = 1.5; end
-tap = mti_geometry('range2tap', r, cfg, kA);
-d = mti_geometry('tap2range', tap, cfg, kB) - r;
+function x = local_finv(p, d1, d2)
+% F-distribution quantile without the Statistics Toolbox, as in
+% cir_phase_analysis_variance: if X ~ F(d1,d2), d1 X/(d1 X + d2) ~ Beta(d1/2, d2/2).
+x  = nan(size(d1));
+ok = isfinite(d1) & isfinite(d2) & d1 >= 1 & d2 >= 1;
+if ~any(ok), return; end
+b = betaincinv(p, d1(ok) / 2, d2(ok) / 2);
+x(ok) = (d2(ok) .* b) ./ (d1(ok) .* (1 - b));
 end
 
 % =============================================================================
@@ -447,6 +536,10 @@ if nargin > 1 && unsignedRms, s = sprintf('%.2f m', e);
 else, s = sprintf('%+.2f m', e); end
 end
 
+function s = local_err2_str(p, trueD)
+s = sprintf('%s / %s', local_err_str(p.strongR - trueD), local_err_str(p.nearR - trueD));
+end
+
 function s = local_ms_str(f)
 if ~isfinite(f.median), s = '-'; return; end
 s = sprintf('%.2f m / %.2f m', f.median, f.spread);
@@ -468,8 +561,8 @@ d = fullfile(root, dd(j).name);
 end
 
 % =============================================================================
-function fig = local_plot(R, o, label, nBg, nP2)
-cM = [0 0.35 0.75];          % magnitude: blue, as cir_phase_analysis2
+function fig = local_plot(R, o, label, nBg, nP2, nMoved)
+cB = [0 0.35 0.75];          % BSDA: blue
 cC = [0.85 0.33 0.1];        % complex: orange
 cT = [0 0.6 0.25];           % where you stood
 fig = figure('Color', 'w', 'Position', [40 30 1250 1150]);
@@ -477,51 +570,50 @@ fig = figure('Color', 'w', 'Position', [40 30 1250 1150]);
 % two difference panels line up for comparing by eye, and no legend hides data.
 pos = @(row) [0.07, 0.05 + (4 - row) * 0.235, 0.60, 0.165];
 g = R.grid; x = R.distance;
-M = R.magnitude; C = R.complex;
+B = R.bsda; C = R.complex;
 
 % 1. Background level and scatter, in dB
 ax1 = axes('Position', pos(1)); hold(ax1, 'on'); grid(ax1, 'on');
 db = @local_db;
 k = g >= -10 & g <= min(60, max(g));
-h1 = plot(ax1, g(k), db(M.bgMean(k)), '-', 'Color', cM, 'LineWidth', 1.6);
+h1 = plot(ax1, g(k), db(B.bgMean(k)), '-', 'Color', cB, 'LineWidth', 1.6);
 h2 = plot(ax1, g(k), db(abs(C.bgMean(k))), '-', 'Color', cC, 'LineWidth', 1.6);
-h3 = plot(ax1, g(k), db(M.bgSD(k)), '--', 'Color', cM, 'LineWidth', 1);
+h3 = plot(ax1, g(k), db(B.bgSD(k)), '--', 'Color', cB, 'LineWidth', 1);
 h4 = plot(ax1, g(k), db(sqrt(C.bgScatter2(k))), '--', 'Color', cC, 'LineWidth', 1);
-top = max(local_db([M.bgMean(k); abs(C.bgMean(k))]));
+top = max(local_db([B.bgMean(k); abs(C.bgMean(k))]));
 yl = [top - 75, top + 8];
 plot(ax1, [R.k0 R.k0], yl, '-', 'Color', [0.8 0 0], 'LineWidth', 1);
 ylim(ax1, yl); xlim(ax1, [g(find(k, 1)) g(find(k, 1, 'last'))]);
-xlabel(ax1, 'Taps from first path (FP)'); ylabel(ax1, 'Amplitude (dB)');
-ttl = sprintf('Background (n = %d): level (solid) and frame-to-frame scatter (dashed); red = k0 %+.2f', ...
-    nBg, R.k0);
+xlabel(ax1, 'Taps from first path (FP), after re-alignment'); ylabel(ax1, 'Amplitude (dB)');
+ttl = sprintf(['Background (n = %d): level (solid) and frame-to-frame scatter (dashed); ' ...
+    'red = range zero %+.2f; %d frames re-aligned'], nBg, R.k0, nMoved);
 if ~isempty(label), ttl = {label, ttl}; end
 title(ax1, ttl, 'Interpreter', 'none');
-local_legend(ax1, [h1 h2 h3 h4], {'Magnitude mean', '|Complex mean|', ...
-    sprintf('Magnitude scatter (%.1f%% on strong taps)', 100 * M.bgScatter), ...
+local_legend(ax1, [h1 h2 h3 h4], {'|CIR| mean', '|Complex mean|', ...
+    sprintf('|CIR| SD (%.1f%% on strong taps)', 100 * B.bgScatter), ...
     sprintf('Complex scatter (%.1f%%)', 100 * C.bgScatter)});
 
-% 2 + 3. The two differences, on one scale
-view = isfinite(x) & x >= o.MinRangeM & x <= o.MaxRangeM;
-dM = max(M.diff, 0);
-yTop = 1.15 * max([dM(view & isfinite(dM)); C.diff(view & isfinite(C.diff)); eps]);
+% 2. BSDA, 3. complex: each on its own scale
+view = isfinite(x) & x >= R.searchFromM & x <= o.MaxRangeM;
+dB = max(B.diff, 0);
 ax2 = axes('Position', pos(2));
-local_diff_panel(ax2, x, dM, M.threshold, M.pick, cM, yTop, R.trueDistance, o, ...
-    sprintf('Magnitude: |phase 2| - |background|, negatives removed (n = %d vs %d)', nP2, nBg), ...
-    M.thresholdNeg, []);
+local_diff_panel(ax2, x, dB, B.threshold, B.pick, cB, local_top(dB, view), R.trueDistance, ...
+    o, R.searchFromM, sprintf('BSDA: SD in phase 2 - SD in background, negatives removed (n = %d vs %d)', ...
+    nP2, nBg), [], '\Delta SD / RXPACC', 'F threshold (per tap)');
 ax3 = axes('Position', pos(3));
-local_diff_panel(ax3, x, C.diff, C.threshold, C.pick, cC, yTop, R.trueDistance, o, ...
-    '|Complex mean of phase 2 - complex mean of background|  (normalised I/Q)', NaN, ...
-    C.weaker);
+local_diff_panel(ax3, x, C.diff, C.threshold, C.pick, cC, local_top(C.diff, view), R.trueDistance, ...
+    o, R.searchFromM, '|Complex mean of phase 2 - complex mean of background|  (normalised I/Q)', ...
+    C.weaker, '\Delta amplitude / RXPACC', 'Threshold (per tap)');
 
-% 4. Single frames
+% 4. Readings through phase 2
 ax4 = axes('Position', pos(4)); hold(ax4, 'on'); grid(ax4, 'on');
 t = R.frameTimes;
-h5 = plot(ax4, t, M.frameReadings, 'o', 'Color', cM, 'MarkerSize', 5);
+h5 = plot(ax4, t, B.frameReadings, 'o', 'Color', cB, 'MarkerSize', 5);
 h6 = plot(ax4, t, C.frameReadings, '.', 'Color', cC, 'MarkerSize', 14);
 hh = [h5 h6];
-lg = {sprintf('Magnitude: %.0f%% of frames, median %s', 100 * M.frames.hit, ...
-          local_num_str(M.frames.median)), ...
-      sprintf('Complex: %.0f%% of frames, median %s', 100 * C.frames.hit, ...
+lg = {sprintf('BSDA (%d-frame window): %.0f%%, median %s', B.windowFrames, 100 * B.frames.hit, ...
+          local_num_str(B.frames.median)), ...
+      sprintf('Complex (each frame): %.0f%%, median %s', 100 * C.frames.hit, ...
           local_num_str(C.frames.median))};
 if isfinite(R.trueDistance)
     hh(end+1) = plot(ax4, [min(t) max(t)], R.trueDistance * [1 1], '-', ...
@@ -531,24 +623,26 @@ end
 ylim(ax4, [0 min(o.MaxRangeM, 4.5)]);
 if numel(t) > 1, xlim(ax4, [min(t) max(t)]); end
 xlabel(ax4, 'Time (s)'); ylabel(ax4, 'Distance (m)');
-title(ax4, 'Single-frame readings in phase 2 (each frame vs the background, no averaging)');
+title(ax4, 'Readings through phase 2 (BSDA: sliding window vs background; complex: each frame alone)');
 local_legend(ax4, hh, lg);
 end
 
-function local_diff_panel(ax, x, v, thr, pk, col, yTop, trueD, o, ttl, thrNeg, weaker)
+function y = local_top(v, view)
+y = 1.15 * max([v(view & isfinite(v)); eps]);
+end
+
+function local_diff_panel(ax, x, v, thr, pk, col, yTop, trueD, o, rStart, ttl, weaker, ...
+                          yLab, thrName)
 hold(ax, 'on'); grid(ax, 'on');
 ok = isfinite(x) & isfinite(v) & x <= o.MaxRangeM;
+patch(ax, [0 rStart rStart 0], [0 0 yTop yTop], [0.94 0.94 0.94], 'EdgeColor', 'none', ...
+    'HandleVisibility', 'off');
 hs = plot(ax, x(ok), v(ok), '-', 'Color', col, 'LineWidth', 1.6, 'Marker', '*', ...
     'MarkerSize', 3);
 okT = isfinite(x) & isfinite(thr) & x <= o.MaxRangeM;
 ht = plot(ax, x(okT), thr(okT), '--', 'Color', col * 0.6 + 0.4, 'LineWidth', 1.2);
 hh = [hs ht];
-lg = {'Difference', 'Threshold (per tap)'};
-if isfinite(thrNeg)
-    hh(end+1) = plot(ax, [0 o.MaxRangeM], thrNeg * [1 1], ':', 'Color', [0.4 0.4 0.4], ...
-        'LineWidth', 1.2);
-    lg{end+1} = 'cir\_phase\_analysis2 threshold';
-end
+lg = {'Difference', thrName};
 if ~isempty(weaker)
     w = weaker & isfinite(x) & x <= o.MaxRangeM;
     if any(w)
@@ -557,7 +651,6 @@ if ~isempty(weaker)
         lg{end+1} = 'Static path got weaker (one you block?)';
     end
 end
-plot(ax, o.MinRangeM * [1 1], [0 yTop], ':', 'Color', [0.6 0.6 0.6]);
 if isfinite(pk.strongR)
     [~, j] = min(abs(x - pk.strongR));
     hh(end+1) = plot(ax, pk.strongR, v(j), 'kd', 'MarkerFaceColor', 'k', 'MarkerSize', 8);
@@ -573,9 +666,11 @@ if isfinite(trueD)
     hh(end+1) = plot(ax, trueD * [1 1], [0 yTop], '-', 'Color', [0 0.6 0.25], 'LineWidth', 2);
     lg{end+1} = sprintf('You stood at %.2f m', trueD);
 end
+text(ax, rStart / 2, 0.92 * yTop, {'not', 'searched'}, 'HorizontalAlignment', 'center', ...
+    'Color', [0.55 0.55 0.55], 'FontSize', 8);
 xlim(ax, [0 o.MaxRangeM]); ylim(ax, [0 yTop]);
 xlabel(ax, 'Distance from the midpoint of the modules (m)');
-ylabel(ax, '\Delta amplitude / RXPACC');
+ylabel(ax, yLab);
 title(ax, ttl);
 local_legend(ax, hh, lg);
 end

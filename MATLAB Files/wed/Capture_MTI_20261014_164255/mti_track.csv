@@ -1,0 +1,822 @@
+elapsed_s,frame,status,detected_m,tracked_m,speed_mps,snr_db
+0.0069,1,settling,NaN,NaN,NaN,NaN
+0.1069,2,settling,NaN,NaN,NaN,NaN
+0.2069,3,settling,NaN,NaN,NaN,NaN
+0.3069,4,settling,NaN,NaN,NaN,NaN
+0.4069,5,settling,NaN,NaN,NaN,NaN
+0.5069,6,settling,NaN,NaN,NaN,NaN
+0.6069,7,settling,NaN,NaN,NaN,NaN
+0.7069,8,settling,NaN,NaN,NaN,NaN
+0.8069,9,settling,NaN,NaN,NaN,NaN
+0.9069,10,settling,NaN,NaN,NaN,NaN
+1.0069,11,settling,NaN,NaN,NaN,NaN
+1.1069,12,settling,NaN,NaN,NaN,NaN
+1.2069,13,settling,NaN,NaN,NaN,NaN
+1.3069,14,settling,NaN,NaN,NaN,NaN
+1.4069,15,settling,NaN,NaN,NaN,NaN
+1.5069,16,settling,NaN,NaN,NaN,NaN
+1.6069,17,settling,NaN,NaN,NaN,NaN
+1.7069,18,settling,NaN,NaN,NaN,NaN
+1.8069,19,settling,NaN,NaN,NaN,NaN
+1.9069,20,settling,NaN,NaN,NaN,NaN
+2.0069,21,settling,NaN,NaN,NaN,NaN
+2.1069,22,settling,NaN,NaN,NaN,NaN
+2.2069,23,settling,NaN,NaN,NaN,NaN
+2.3069,24,settling,NaN,NaN,NaN,NaN
+2.4069,25,settling,NaN,NaN,NaN,NaN
+2.5069,26,settling,NaN,NaN,NaN,NaN
+2.6069,27,settling,NaN,NaN,NaN,NaN
+2.7069,28,settling,NaN,NaN,NaN,NaN
+2.8069,29,settling,NaN,NaN,NaN,NaN
+2.9069,30,settling,NaN,NaN,NaN,NaN
+3.0069,31,learning,NaN,NaN,NaN,NaN
+3.1069,32,learning,NaN,NaN,NaN,NaN
+3.2069,33,learning,NaN,NaN,NaN,NaN
+3.3070,34,learning,NaN,NaN,NaN,NaN
+3.4070,35,learning,NaN,NaN,NaN,NaN
+3.5070,36,learning,NaN,NaN,NaN,NaN
+3.6070,37,learning,NaN,NaN,NaN,NaN
+3.7070,38,learning,NaN,NaN,NaN,NaN
+3.8070,39,learning,NaN,NaN,NaN,NaN
+3.9070,40,learning,NaN,NaN,NaN,NaN
+4.0070,41,learning,NaN,NaN,NaN,NaN
+4.1070,42,learning,NaN,NaN,NaN,NaN
+4.2070,43,learning,NaN,NaN,NaN,NaN
+4.3070,44,learning,NaN,NaN,NaN,NaN
+4.4070,45,learning,NaN,NaN,NaN,NaN
+4.5070,46,learning,NaN,NaN,NaN,NaN
+4.6070,47,learning,NaN,NaN,NaN,NaN
+4.7070,48,learning,NaN,NaN,NaN,NaN
+4.8070,49,learning,NaN,NaN,NaN,NaN
+4.9070,50,learning,NaN,NaN,NaN,NaN
+5.0070,51,learning,NaN,NaN,NaN,NaN
+5.1070,52,learning,NaN,NaN,NaN,NaN
+5.2070,53,learning,NaN,NaN,NaN,NaN
+5.3070,54,learning,NaN,NaN,NaN,NaN
+5.4070,55,learning,NaN,NaN,NaN,NaN
+5.5070,56,learning,NaN,NaN,NaN,NaN
+5.6070,57,learning,NaN,NaN,NaN,NaN
+5.7070,58,learning,NaN,NaN,NaN,NaN
+5.8070,59,learning,NaN,NaN,NaN,NaN
+5.9070,60,learning,NaN,NaN,NaN,NaN
+6.0070,61,learning,NaN,NaN,NaN,NaN
+6.1070,62,learning,NaN,NaN,NaN,NaN
+6.2070,63,learning,NaN,NaN,NaN,NaN
+6.3070,64,learning,NaN,NaN,NaN,NaN
+6.4070,65,learning,NaN,NaN,NaN,NaN
+6.5070,66,learning,NaN,NaN,NaN,NaN
+6.6070,67,learning,NaN,NaN,NaN,NaN
+6.7070,68,learning,NaN,NaN,NaN,NaN
+6.8070,69,learning,NaN,NaN,NaN,NaN
+6.9070,70,learning,NaN,NaN,NaN,NaN
+7.0070,71,learning,NaN,NaN,NaN,NaN
+7.1070,72,learning,NaN,NaN,NaN,NaN
+7.2070,73,learning,NaN,NaN,NaN,NaN
+7.3070,74,learning,NaN,NaN,NaN,NaN
+7.4070,75,learning,NaN,NaN,NaN,NaN
+7.5070,76,learning,NaN,NaN,NaN,NaN
+7.6070,77,learning,NaN,NaN,NaN,NaN
+7.7070,78,learning,NaN,NaN,NaN,NaN
+7.8070,79,learning,NaN,NaN,NaN,NaN
+7.9070,80,learning,NaN,NaN,NaN,NaN
+8.0070,81,learning,NaN,NaN,NaN,NaN
+8.1070,82,learning,NaN,NaN,NaN,NaN
+8.2070,83,learning,NaN,NaN,NaN,NaN
+8.3070,84,learning,NaN,NaN,NaN,NaN
+8.4070,85,learning,NaN,NaN,NaN,NaN
+8.5070,86,learning,NaN,NaN,NaN,NaN
+8.6070,87,learning,NaN,NaN,NaN,NaN
+8.7070,88,learning,NaN,NaN,NaN,NaN
+8.8070,89,learning,NaN,NaN,NaN,NaN
+8.9070,90,learning,NaN,NaN,NaN,NaN
+9.0070,91,learning,NaN,NaN,NaN,NaN
+9.1070,92,learning,NaN,NaN,NaN,NaN
+9.2070,93,learning,NaN,NaN,NaN,NaN
+9.3070,94,learning,NaN,NaN,NaN,NaN
+9.4070,95,learning,NaN,NaN,NaN,NaN
+9.5070,96,learning,NaN,NaN,NaN,NaN
+9.6070,97,learning,NaN,NaN,NaN,NaN
+9.7070,98,learning,NaN,NaN,NaN,NaN
+9.8070,99,learning,NaN,NaN,NaN,NaN
+9.9071,100,learning,NaN,NaN,NaN,NaN
+10.0071,101,learning,NaN,NaN,NaN,NaN
+10.1071,102,learning,NaN,NaN,NaN,NaN
+10.2071,103,learning,NaN,NaN,NaN,NaN
+10.3071,104,learning,NaN,NaN,NaN,NaN
+10.4071,105,learning,NaN,NaN,NaN,NaN
+10.5071,106,learning,NaN,NaN,NaN,NaN
+10.6071,107,learning,NaN,NaN,NaN,NaN
+10.7071,108,learning,NaN,NaN,NaN,NaN
+10.8071,109,learning,NaN,NaN,NaN,NaN
+10.9071,110,learning,NaN,NaN,NaN,NaN
+11.0071,111,learning,NaN,NaN,NaN,NaN
+11.1071,112,learning,NaN,NaN,NaN,NaN
+11.2071,113,learning,NaN,NaN,NaN,NaN
+11.3071,114,learning,NaN,NaN,NaN,NaN
+11.4071,115,learning,NaN,NaN,NaN,NaN
+11.5071,116,learning,NaN,NaN,NaN,NaN
+11.6071,117,learning,NaN,NaN,NaN,NaN
+11.7071,118,learning,NaN,NaN,NaN,NaN
+11.8071,119,learning,NaN,NaN,NaN,NaN
+11.9071,120,learning,NaN,NaN,NaN,NaN
+12.0071,121,learning,NaN,NaN,NaN,NaN
+12.1071,122,learning,NaN,NaN,NaN,NaN
+12.2071,123,learning,NaN,NaN,NaN,NaN
+12.3071,124,learning,NaN,NaN,NaN,NaN
+12.4071,125,learning,NaN,NaN,NaN,NaN
+12.5071,126,learning,NaN,NaN,NaN,NaN
+12.6071,127,learning,NaN,NaN,NaN,NaN
+12.7071,128,learning,NaN,NaN,NaN,NaN
+12.8071,129,learning,NaN,NaN,NaN,NaN
+12.9071,130,learning,NaN,NaN,NaN,NaN
+13.0071,131,learning,NaN,NaN,NaN,NaN
+13.1071,132,no target,NaN,NaN,NaN,NaN
+13.2071,133,no target,NaN,NaN,NaN,NaN
+13.3071,134,no target,NaN,NaN,NaN,NaN
+13.4071,135,no target,NaN,NaN,NaN,NaN
+13.5071,136,no target,NaN,NaN,NaN,NaN
+13.6071,137,no target,NaN,NaN,NaN,NaN
+13.7071,138,no target,NaN,NaN,NaN,NaN
+13.8071,139,no target,NaN,NaN,NaN,NaN
+13.9071,140,no target,NaN,NaN,NaN,NaN
+14.0071,141,no target,NaN,NaN,NaN,NaN
+14.1071,142,no target,NaN,NaN,NaN,NaN
+14.2071,143,no target,NaN,NaN,NaN,NaN
+14.3071,144,no target,NaN,NaN,NaN,NaN
+14.4071,145,no target,NaN,NaN,NaN,NaN
+14.5071,146,no target,NaN,NaN,NaN,NaN
+14.6071,147,no target,NaN,NaN,NaN,NaN
+14.7071,148,no target,NaN,NaN,NaN,NaN
+14.8071,149,no target,NaN,NaN,NaN,NaN
+14.9071,150,no target,NaN,NaN,NaN,NaN
+15.0071,151,no target,NaN,NaN,NaN,NaN
+15.1071,152,no target,NaN,NaN,NaN,NaN
+15.2071,153,no target,NaN,NaN,NaN,NaN
+15.3071,154,no target,NaN,NaN,NaN,NaN
+15.4071,155,no target,NaN,NaN,NaN,NaN
+15.5071,156,no target,NaN,NaN,NaN,NaN
+15.6071,157,no target,NaN,NaN,NaN,NaN
+15.7071,158,no target,NaN,NaN,NaN,NaN
+15.8071,159,no target,NaN,NaN,NaN,NaN
+15.9071,160,no target,NaN,NaN,NaN,NaN
+16.0071,161,no target,NaN,NaN,NaN,NaN
+16.1071,162,no target,NaN,NaN,NaN,NaN
+16.2071,163,no target,NaN,NaN,NaN,NaN
+16.3071,164,no target,NaN,NaN,NaN,NaN
+16.4071,165,no target,NaN,NaN,NaN,NaN
+16.5072,166,no target,NaN,NaN,NaN,NaN
+16.6072,167,no target,NaN,NaN,NaN,NaN
+16.7072,168,no target,NaN,NaN,NaN,NaN
+16.8072,169,no target,NaN,NaN,NaN,NaN
+16.9072,170,no target,NaN,NaN,NaN,NaN
+17.0072,171,no target,NaN,NaN,NaN,NaN
+17.1072,172,no target,NaN,NaN,NaN,NaN
+17.2072,173,no target,NaN,NaN,NaN,NaN
+17.3072,174,no target,NaN,NaN,NaN,NaN
+17.4072,175,no target,NaN,NaN,NaN,NaN
+17.5072,176,no target,NaN,NaN,NaN,NaN
+17.6072,177,no target,NaN,NaN,NaN,NaN
+17.7072,178,no target,NaN,NaN,NaN,NaN
+17.8072,179,no target,NaN,NaN,NaN,NaN
+17.9072,180,no target,NaN,NaN,NaN,NaN
+18.0072,181,no target,NaN,NaN,NaN,NaN
+18.1072,182,no target,NaN,NaN,NaN,NaN
+18.2072,183,no target,NaN,NaN,NaN,NaN
+18.3072,184,no target,NaN,NaN,NaN,NaN
+18.4072,185,no target,NaN,NaN,NaN,NaN
+18.5072,186,no target,NaN,NaN,NaN,NaN
+18.6072,187,no target,NaN,NaN,NaN,NaN
+18.7072,188,no target,NaN,NaN,NaN,NaN
+18.8072,189,no target,NaN,NaN,NaN,NaN
+18.9072,190,no target,NaN,NaN,NaN,NaN
+19.0072,191,no target,NaN,NaN,NaN,NaN
+19.1072,192,no target,NaN,NaN,NaN,NaN
+19.2072,193,no target,NaN,NaN,NaN,NaN
+19.3072,194,no target,NaN,NaN,NaN,NaN
+19.4072,195,no target,NaN,NaN,NaN,NaN
+19.5072,196,no target,NaN,NaN,NaN,NaN
+19.6072,197,no target,NaN,NaN,NaN,NaN
+19.7072,198,no target,NaN,NaN,NaN,NaN
+19.8072,199,no target,NaN,NaN,NaN,NaN
+19.9072,200,no target,NaN,NaN,NaN,NaN
+20.0072,201,no target,NaN,NaN,NaN,NaN
+20.1072,202,no target,NaN,NaN,NaN,NaN
+20.2072,203,no target,NaN,NaN,NaN,NaN
+20.3072,204,no target,NaN,NaN,NaN,NaN
+20.4072,205,no target,NaN,NaN,NaN,NaN
+20.5072,206,no target,NaN,NaN,NaN,NaN
+20.6072,207,no target,NaN,NaN,NaN,NaN
+20.7072,208,no target,NaN,NaN,NaN,NaN
+20.8072,209,no target,NaN,NaN,NaN,NaN
+20.9072,210,no target,NaN,NaN,NaN,NaN
+21.0072,211,no target,NaN,NaN,NaN,NaN
+21.1072,212,no target,NaN,NaN,NaN,NaN
+21.2072,213,no target,NaN,NaN,NaN,NaN
+21.3072,214,no target,NaN,NaN,NaN,NaN
+21.4072,215,no target,NaN,NaN,NaN,NaN
+21.5072,216,no target,NaN,NaN,NaN,NaN
+21.6072,217,no target,NaN,NaN,NaN,NaN
+21.7072,218,no target,NaN,NaN,NaN,NaN
+21.8072,219,no target,NaN,NaN,NaN,NaN
+21.9072,220,no target,NaN,NaN,NaN,NaN
+22.0072,221,no target,NaN,NaN,NaN,NaN
+22.1072,222,no target,NaN,NaN,NaN,NaN
+22.2072,223,no target,NaN,NaN,NaN,NaN
+22.3072,224,no target,NaN,NaN,NaN,NaN
+22.4072,225,no target,NaN,NaN,NaN,NaN
+22.5072,226,no target,NaN,NaN,NaN,NaN
+22.6072,227,no target,NaN,NaN,NaN,NaN
+22.7072,228,no target,NaN,NaN,NaN,NaN
+22.8072,229,no target,NaN,NaN,NaN,NaN
+22.9072,230,no target,NaN,NaN,NaN,NaN
+23.0072,231,no target,NaN,NaN,NaN,NaN
+23.1073,232,no target,NaN,NaN,NaN,NaN
+23.2073,233,no target,NaN,NaN,NaN,NaN
+23.3073,234,no target,NaN,NaN,NaN,NaN
+23.4073,235,no target,NaN,NaN,NaN,NaN
+23.5073,236,no target,NaN,NaN,NaN,NaN
+23.6073,237,no target,NaN,NaN,NaN,NaN
+23.7073,238,no target,NaN,NaN,NaN,NaN
+23.8073,239,no target,NaN,NaN,NaN,NaN
+23.9073,240,no target,NaN,NaN,NaN,NaN
+24.0073,241,no target,NaN,NaN,NaN,NaN
+24.1073,242,no target,NaN,NaN,NaN,NaN
+24.2073,243,no target,NaN,NaN,NaN,NaN
+24.3073,244,no target,NaN,NaN,NaN,NaN
+24.4073,245,no target,NaN,NaN,NaN,NaN
+24.5073,246,no target,NaN,NaN,NaN,NaN
+24.6073,247,no target,NaN,NaN,NaN,NaN
+24.7073,248,no target,NaN,NaN,NaN,NaN
+24.8073,249,no target,NaN,NaN,NaN,NaN
+24.9073,250,no target,NaN,NaN,NaN,NaN
+25.0073,251,no target,NaN,NaN,NaN,NaN
+25.1073,252,no target,NaN,NaN,NaN,NaN
+25.2073,253,no target,NaN,NaN,NaN,NaN
+25.3073,254,no target,NaN,NaN,NaN,NaN
+25.4073,255,no target,NaN,NaN,NaN,NaN
+25.5073,256,no target,NaN,NaN,NaN,NaN
+25.6073,257,no target,NaN,NaN,NaN,NaN
+25.7073,258,no target,NaN,NaN,NaN,NaN
+25.8073,259,no target,NaN,NaN,NaN,NaN
+25.9073,260,no target,NaN,NaN,NaN,NaN
+26.0073,261,no target,NaN,NaN,NaN,NaN
+26.1073,262,no target,NaN,NaN,NaN,NaN
+26.2073,263,no target,NaN,NaN,NaN,NaN
+26.3073,264,no target,NaN,NaN,NaN,NaN
+26.4073,265,no target,NaN,NaN,NaN,NaN
+26.5073,266,no target,NaN,NaN,NaN,NaN
+26.6073,267,no target,NaN,NaN,NaN,NaN
+26.7073,268,no target,NaN,NaN,NaN,NaN
+26.8073,269,no target,NaN,NaN,NaN,NaN
+26.9073,270,no target,NaN,NaN,NaN,NaN
+27.0073,271,no target,NaN,NaN,NaN,NaN
+27.1073,272,no target,NaN,NaN,NaN,NaN
+27.2073,273,no target,NaN,NaN,NaN,NaN
+27.3073,274,no target,NaN,NaN,NaN,NaN
+27.4073,275,no target,NaN,NaN,NaN,NaN
+27.5073,276,no target,NaN,NaN,NaN,NaN
+27.6073,277,no target,NaN,NaN,NaN,NaN
+27.7073,278,no target,NaN,NaN,NaN,NaN
+27.8073,279,no target,NaN,NaN,NaN,NaN
+27.9073,280,no target,NaN,NaN,NaN,NaN
+28.0073,281,no target,NaN,NaN,NaN,NaN
+28.1073,282,no target,NaN,NaN,NaN,NaN
+28.2073,283,no target,NaN,NaN,NaN,NaN
+28.3073,284,no target,NaN,NaN,NaN,NaN
+28.4073,285,no target,NaN,NaN,NaN,NaN
+28.5073,286,no target,NaN,NaN,NaN,NaN
+28.6073,287,tracking,3.4851,3.4851,0.0000,7.00
+28.7073,288,coasting,NaN,3.4851,0.0000,NaN
+28.8073,289,coasting,NaN,3.4851,0.0000,NaN
+28.9073,290,coasting,NaN,3.4851,0.0000,NaN
+29.0073,291,coasting,NaN,3.4851,0.0000,NaN
+29.1073,292,coasting,NaN,3.4851,0.0000,NaN
+29.2073,293,coasting,NaN,3.4851,0.0000,NaN
+29.3073,294,coasting,NaN,3.4851,0.0000,NaN
+29.4073,295,coasting,NaN,3.4851,0.0000,NaN
+29.5073,296,coasting,NaN,3.4851,0.0000,NaN
+29.6073,297,coasting,NaN,3.4851,0.0000,NaN
+29.7074,298,coasting,NaN,3.4851,0.0000,NaN
+29.8074,299,coasting,NaN,3.4851,0.0000,NaN
+29.9074,300,coasting,NaN,3.4851,0.0000,NaN
+30.0074,301,coasting,NaN,3.4851,0.0000,NaN
+30.1074,302,no target,NaN,NaN,NaN,NaN
+30.2074,303,no target,NaN,NaN,NaN,NaN
+30.3074,304,no target,NaN,NaN,NaN,NaN
+30.4074,305,no target,NaN,NaN,NaN,NaN
+30.5074,306,no target,NaN,NaN,NaN,NaN
+30.6074,307,no target,NaN,NaN,NaN,NaN
+30.7074,308,no target,NaN,NaN,NaN,NaN
+30.8074,309,no target,NaN,NaN,NaN,NaN
+30.9074,310,no target,NaN,NaN,NaN,NaN
+31.0074,311,no target,NaN,NaN,NaN,NaN
+31.1074,312,no target,NaN,NaN,NaN,NaN
+31.2074,313,no target,NaN,NaN,NaN,NaN
+31.3074,314,no target,NaN,NaN,NaN,NaN
+31.4074,315,tracking,3.2125,3.2125,0.0000,8.75
+31.5074,316,tracking,3.2121,3.2123,-0.0006,8.73
+31.6074,317,tracking,3.1498,3.1810,-0.0942,6.85
+31.7074,318,coasting,NaN,3.1716,-0.0753,NaN
+31.8074,319,tracking,3.1868,3.1754,-0.0412,9.08
+31.9074,320,tracking,3.1894,3.1803,-0.0142,8.76
+32.0074,321,tracking,3.1897,3.1843,0.0021,8.80
+32.1074,322,tracking,3.1258,3.1552,-0.0860,10.58
+32.2074,323,tracking,3.1260,3.1363,-0.1169,10.56
+32.3074,324,tracking,3.1139,3.1192,-0.1330,11.44
+32.4074,325,tracking,2.7445,2.9252,-0.6752,9.20
+32.5074,326,tracking,2.8062,2.8319,-0.7524,9.20
+32.6074,327,tracking,2.7245,2.7406,-0.8007,8.61
+32.7074,328,tracking,3.0646,2.8626,-0.1946,7.77
+32.8074,329,tracking,3.0602,2.9517,0.1311,10.31
+32.9074,330,tracking,3.0654,3.0151,0.2821,9.99
+33.0074,331,tracking,3.0650,3.0541,0.3146,10.02
+33.1074,332,tracking,3.0783,3.0819,0.3036,7.39
+33.2074,333,coasting,NaN,3.1123,0.2429,NaN
+33.3074,334,coasting,NaN,3.1366,0.1943,NaN
+33.4074,335,coasting,NaN,3.1560,0.1555,NaN
+33.5074,336,coasting,NaN,3.1716,0.1244,NaN
+33.6074,337,coasting,NaN,3.1840,0.0995,NaN
+33.7074,338,coasting,NaN,3.1940,0.0796,NaN
+33.8074,339,coasting,NaN,3.2019,0.0637,NaN
+33.9074,340,coasting,NaN,3.2083,0.0509,NaN
+34.0074,341,coasting,NaN,3.2134,0.0408,NaN
+34.1074,342,coasting,NaN,3.2175,0.0326,NaN
+34.2074,343,coasting,NaN,3.2207,0.0261,NaN
+34.3074,344,coasting,NaN,3.2233,0.0209,NaN
+34.4074,345,coasting,NaN,3.2254,0.0167,NaN
+34.5074,346,tracking,0.8844,0.8844,0.0000,7.38
+34.6074,347,tracking,0.8851,0.8848,0.0010,7.35
+34.7074,348,tracking,0.8852,0.8851,0.0016,7.35
+34.8074,349,coasting,NaN,0.8852,0.0013,NaN
+34.9074,350,coasting,NaN,0.8854,0.0010,NaN
+35.0074,351,coasting,NaN,0.8855,0.0008,NaN
+35.1074,352,coasting,NaN,0.8855,0.0007,NaN
+35.2074,353,coasting,NaN,0.8856,0.0005,NaN
+35.3074,354,coasting,NaN,0.8857,0.0004,NaN
+35.4074,355,tracking,3.0835,3.0835,0.0000,7.40
+35.5074,356,tracking,3.0835,3.0835,-0.0001,7.41
+35.6074,357,tracking,3.0907,3.0871,0.0107,7.59
+35.7074,358,coasting,NaN,3.0881,0.0086,NaN
+35.8074,359,coasting,NaN,3.0890,0.0068,NaN
+35.9074,360,coasting,NaN,3.0897,0.0055,NaN
+36.0074,361,tracking,2.9612,3.0257,-0.1880,6.64
+36.1074,362,tracking,2.9691,2.9880,-0.2448,7.21
+36.2075,363,tracking,2.9740,2.9687,-0.2291,7.19
+36.3075,364,coasting,NaN,2.9458,-0.1833,NaN
+36.4075,365,coasting,NaN,2.9275,-0.1466,NaN
+36.5075,366,tracking,2.7469,2.8299,-0.3956,8.06
+36.6075,367,tracking,2.7273,2.7588,-0.4901,12.27
+36.7075,368,tracking,2.7219,2.7159,-0.4719,11.79
+36.8075,369,tracking,2.7563,2.7125,-0.3405,13.08
+36.9075,370,tracking,2.8147,2.7466,-0.1361,16.00
+37.0075,371,tracking,2.7374,2.7352,-0.1295,20.52
+37.1075,372,tracking,2.7341,2.7281,-0.1117,20.62
+37.2075,373,tracking,2.7144,2.7157,-0.1155,19.31
+37.3075,374,tracking,2.6466,2.6754,-0.2017,15.01
+37.4075,375,tracking,2.7643,2.7098,-0.0381,15.91
+37.5075,376,tracking,2.1992,2.4526,-0.7983,6.39
+37.6075,377,tracking,2.6891,2.5309,-0.3238,17.42
+37.7075,378,tracking,2.6408,2.5697,-0.1103,15.78
+37.8075,379,tracking,2.6391,2.5989,0.0103,14.51
+37.9075,380,coasting,NaN,2.5999,0.0083,NaN
+38.0075,381,coasting,NaN,2.6007,0.0066,NaN
+38.1075,382,tracking,2.4910,2.5462,-0.1590,16.95
+38.2075,383,tracking,2.4913,2.5108,-0.2175,16.94
+38.3075,384,tracking,2.4914,2.4902,-0.2140,16.94
+38.4075,385,coasting,NaN,2.4688,-0.1712,NaN
+38.5075,386,coasting,NaN,2.4517,-0.1369,NaN
+38.6075,387,coasting,NaN,2.4380,-0.1095,NaN
+38.7075,388,tracking,2.3405,2.3838,-0.2393,10.06
+38.8075,389,tracking,2.3410,2.3504,-0.2676,10.01
+38.9075,390,tracking,2.3764,2.3500,-0.1885,13.72
+39.0075,391,tracking,2.4223,2.3767,-0.0519,11.88
+39.1075,392,tracking,2.4224,2.3970,0.0244,11.86
+39.2075,393,coasting,NaN,2.3994,0.0195,NaN
+39.3075,394,coasting,NaN,2.4014,0.0156,NaN
+39.4075,395,coasting,NaN,2.4029,0.0125,NaN
+39.5075,396,coasting,NaN,2.4042,0.0100,NaN
+39.6075,397,coasting,NaN,2.4052,0.0080,NaN
+39.7075,398,coasting,NaN,2.4060,0.0064,NaN
+39.8075,399,coasting,NaN,2.4066,0.0051,NaN
+39.9075,400,tracking,2.1482,2.2777,-0.3832,15.26
+40.0075,401,tracking,2.1534,2.1964,-0.5121,17.19
+40.1075,402,tracking,2.1443,2.1447,-0.5134,17.48
+40.2075,403,tracking,2.1678,2.1306,-0.4017,14.54
+40.3075,404,tracking,2.3442,2.2173,-0.0211,10.22
+40.4075,405,tracking,2.2913,2.2532,0.0930,10.07
+40.5075,406,coasting,NaN,2.2625,0.0744,NaN
+40.6075,407,coasting,NaN,2.2700,0.0595,NaN
+40.7075,408,coasting,NaN,2.2759,0.0476,NaN
+40.8075,409,tracking,2.0835,2.1821,-0.2482,14.41
+40.9075,410,tracking,2.0856,2.1214,-0.3558,17.52
+41.0075,411,tracking,2.0856,2.0857,-0.3562,17.52
+41.1075,412,tracking,2.1404,2.0953,-0.2206,18.24
+41.2075,413,tracking,2.1694,2.1213,-0.0763,16.22
+41.3075,414,tracking,2.1461,2.1299,-0.0277,17.45
+41.4075,415,tracking,2.0870,2.1070,-0.0879,12.57
+41.5075,416,tracking,2.0826,2.0904,-0.1114,15.03
+41.6075,417,tracking,2.0741,2.0767,-0.1191,11.52
+41.7075,418,tracking,2.1071,2.0859,-0.0557,12.31
+41.8075,419,tracking,2.2422,2.1613,0.1871,10.26
+41.9075,420,tracking,2.2467,2.2134,0.2871,10.54
+42.0075,421,tracking,2.0752,2.1587,0.0369,12.41
+42.1075,422,tracking,2.1097,2.1360,-0.0421,16.75
+42.2075,423,tracking,2.1093,2.1206,-0.0758,16.75
+42.3075,424,tracking,2.1265,2.1197,-0.0555,15.12
+42.4075,425,coasting,NaN,2.1142,-0.0444,NaN
+42.5075,426,coasting,NaN,2.1097,-0.0355,NaN
+42.6075,427,coasting,NaN,2.1062,-0.0284,NaN
+42.7075,428,coasting,NaN,2.1033,-0.0228,NaN
+42.8076,429,coasting,NaN,2.1011,-0.0182,NaN
+42.9076,430,coasting,NaN,2.0992,-0.0146,NaN
+43.0076,431,coasting,NaN,2.0978,-0.0116,NaN
+43.1076,432,coasting,NaN,2.0966,-0.0093,NaN
+43.2076,433,coasting,NaN,2.0957,-0.0075,NaN
+43.3076,434,coasting,NaN,2.0949,-0.0060,NaN
+43.4076,435,coasting,NaN,2.0944,-0.0048,NaN
+43.5076,436,coasting,NaN,2.0939,-0.0038,NaN
+43.6076,437,coasting,NaN,2.0935,-0.0031,NaN
+43.7076,438,coasting,NaN,2.0932,-0.0024,NaN
+43.8076,439,no target,NaN,NaN,NaN,NaN
+43.9076,440,no target,NaN,NaN,NaN,NaN
+44.0076,441,no target,NaN,NaN,NaN,NaN
+44.1076,442,no target,NaN,NaN,NaN,NaN
+44.2076,443,no target,NaN,NaN,NaN,NaN
+44.3076,444,no target,NaN,NaN,NaN,NaN
+44.4076,445,no target,NaN,NaN,NaN,NaN
+44.5076,446,no target,NaN,NaN,NaN,NaN
+44.6076,447,no target,NaN,NaN,NaN,NaN
+44.7076,448,no target,NaN,NaN,NaN,NaN
+44.8076,449,no target,NaN,NaN,NaN,NaN
+44.9076,450,no target,NaN,NaN,NaN,NaN
+45.0076,451,no target,NaN,NaN,NaN,NaN
+45.1076,452,tracking,2.0800,2.0800,0.0000,17.26
+45.2076,453,tracking,2.0800,2.0800,-0.0001,17.26
+45.3076,454,tracking,2.0799,2.0799,-0.0001,17.26
+45.4076,455,tracking,2.0577,2.0688,-0.0335,14.02
+45.5076,456,tracking,2.0576,2.0615,-0.0453,14.02
+45.6076,457,tracking,2.0872,2.0721,0.0000,20.25
+45.7076,458,tracking,2.0980,2.0851,0.0389,19.07
+45.8076,459,tracking,2.0980,2.0935,0.0525,19.07
+45.9076,460,coasting,NaN,2.0987,0.0420,NaN
+46.0076,461,coasting,NaN,2.1029,0.0336,NaN
+46.1076,462,tracking,2.1667,2.1365,0.1243,16.33
+46.2076,463,tracking,2.1667,2.1578,0.1508,16.33
+46.3076,464,tracking,2.1666,2.1697,0.1413,16.33
+46.4076,465,coasting,NaN,2.1839,0.1131,NaN
+46.5076,466,coasting,NaN,2.1952,0.0905,NaN
+46.6076,467,coasting,NaN,2.2042,0.0724,NaN
+46.7076,468,coasting,NaN,2.2115,0.0579,NaN
+46.8076,469,tracking,2.1475,2.1824,-0.0468,8.02
+46.9076,470,tracking,2.1481,2.1629,-0.0911,8.02
+47.0076,471,tracking,2.1959,2.1748,-0.0280,10.86
+47.1076,472,tracking,2.2557,2.2139,0.0975,10.53
+47.2076,473,tracking,2.2555,2.2396,0.1453,12.78
+47.3076,474,tracking,2.2555,2.2548,0.1474,10.85
+47.4076,475,tracking,2.2565,2.2630,0.1278,8.92
+47.5076,476,coasting,NaN,2.2758,0.1023,NaN
+47.6076,477,tracking,2.2288,2.2574,0.0164,7.79
+47.7076,478,tracking,2.2521,2.2556,0.0060,12.45
+47.8076,479,tracking,2.2204,2.2383,-0.0477,13.52
+47.9076,480,tracking,2.2178,2.2256,-0.0712,12.21
+48.0076,481,tracking,2.1378,2.1782,-0.1923,9.22
+48.1076,482,tracking,2.1763,2.1676,-0.1662,12.41
+48.2076,483,tracking,2.1773,2.1642,-0.1268,12.40
+48.3076,484,tracking,2.1784,2.1649,-0.0864,12.39
+48.4076,485,tracking,2.1007,2.1285,-0.1698,14.39
+48.5076,486,tracking,2.0822,2.0968,-0.2138,15.60
+48.6076,487,tracking,2.0751,2.0753,-0.2144,15.98
+48.7076,488,tracking,2.0196,2.0367,-0.2658,10.92
+48.8076,489,coasting,NaN,2.0101,-0.2126,NaN
+48.9076,490,coasting,NaN,1.9888,-0.1701,NaN
+49.0076,491,tracking,2.0768,2.0243,-0.0127,12.04
+49.1076,492,tracking,2.0769,2.0500,0.0681,12.06
+49.2076,493,tracking,2.0770,2.0669,0.0984,12.06
+49.3077,494,tracking,2.3237,2.2002,0.4688,7.83
+49.4077,495,tracking,1.7758,2.0114,-0.2381,6.27
+49.5077,496,tracking,1.7750,1.8813,-0.5570,6.29
+49.6077,497,tracking,2.0684,1.9470,-0.1927,11.97
+49.7077,498,coasting,NaN,1.9278,-0.1542,NaN
+49.8077,499,coasting,NaN,1.9123,-0.1234,NaN
+49.9077,500,coasting,NaN,1.9000,-0.0987,NaN
+50.0077,501,coasting,NaN,1.8901,-0.0790,NaN
+50.1077,502,coasting,NaN,1.8822,-0.0632,NaN
+50.2077,503,coasting,NaN,1.8759,-0.0505,NaN
+50.3077,504,coasting,NaN,1.8709,-0.0404,NaN
+50.4077,505,coasting,NaN,1.8668,-0.0323,NaN
+50.5077,506,coasting,NaN,1.8636,-0.0259,NaN
+50.6077,507,coasting,NaN,1.8610,-0.0207,NaN
+50.7077,508,coasting,NaN,1.8589,-0.0166,NaN
+50.8077,509,tracking,2.0812,1.9692,0.3193,12.53
+50.9077,510,tracking,2.0812,2.0412,0.4394,12.53
+51.0077,511,tracking,2.0815,2.0833,0.4340,12.53
+51.1077,512,coasting,NaN,2.1267,0.3472,NaN
+51.2077,513,coasting,NaN,2.1615,0.2778,NaN
+51.3077,514,coasting,NaN,2.1892,0.2222,NaN
+51.4077,515,coasting,NaN,2.2115,0.1778,NaN
+51.5077,516,coasting,NaN,2.2292,0.1422,NaN
+51.6077,517,coasting,NaN,2.2435,0.1138,NaN
+51.7077,518,coasting,NaN,2.2548,0.0910,NaN
+51.8077,519,coasting,NaN,2.2639,0.0728,NaN
+51.9077,520,coasting,NaN,2.2712,0.0583,NaN
+52.0077,521,coasting,NaN,2.2770,0.0466,NaN
+52.1077,522,coasting,NaN,2.2817,0.0373,NaN
+52.2077,523,tracking,2.0132,2.1493,-0.3710,8.65
+52.3077,524,tracking,1.9564,2.0343,-0.6047,9.64
+52.4077,525,tracking,1.9167,1.9453,-0.6904,11.72
+52.5077,526,tracking,2.0540,1.9651,-0.4237,8.82
+52.6077,527,tracking,2.1284,2.0256,-0.1154,7.74
+52.7077,528,coasting,NaN,2.0140,-0.0923,NaN
+52.8077,529,coasting,NaN,2.0048,-0.0738,NaN
+52.9077,530,coasting,NaN,1.9974,-0.0591,NaN
+53.0077,531,coasting,NaN,1.9915,-0.0472,NaN
+53.1077,532,coasting,NaN,1.9868,-0.0378,NaN
+53.2077,533,coasting,NaN,1.9830,-0.0302,NaN
+53.3077,534,coasting,NaN,1.9800,-0.0242,NaN
+53.4077,535,coasting,NaN,1.9776,-0.0194,NaN
+53.5077,536,coasting,NaN,1.9756,-0.0155,NaN
+53.6077,537,coasting,NaN,1.9741,-0.0124,NaN
+53.7077,538,coasting,NaN,1.9728,-0.0099,NaN
+53.8077,539,coasting,NaN,1.9718,-0.0079,NaN
+53.9077,540,coasting,NaN,1.9710,-0.0063,NaN
+54.0077,541,coasting,NaN,1.9704,-0.0051,NaN
+54.1077,542,no target,NaN,NaN,NaN,NaN
+54.2077,543,no target,NaN,NaN,NaN,NaN
+54.3077,544,no target,NaN,NaN,NaN,NaN
+54.4077,545,no target,NaN,NaN,NaN,NaN
+54.5077,546,no target,NaN,NaN,NaN,NaN
+54.6077,547,no target,NaN,NaN,NaN,NaN
+54.7077,548,no target,NaN,NaN,NaN,NaN
+54.8077,549,no target,NaN,NaN,NaN,NaN
+54.9077,550,no target,NaN,NaN,NaN,NaN
+55.0077,551,no target,NaN,NaN,NaN,NaN
+55.1077,552,no target,NaN,NaN,NaN,NaN
+55.2077,553,no target,NaN,NaN,NaN,NaN
+55.3077,554,tracking,2.0416,2.0416,0.0000,8.48
+55.4077,555,tracking,2.0413,2.0415,-0.0005,8.48
+55.5077,556,tracking,2.0967,2.0691,0.0825,8.05
+55.6077,557,coasting,NaN,2.0773,0.0660,NaN
+55.7077,558,coasting,NaN,2.0839,0.0528,NaN
+55.8077,559,coasting,NaN,2.0892,0.0422,NaN
+55.9078,560,coasting,NaN,2.0934,0.0338,NaN
+56.0078,561,coasting,NaN,2.0968,0.0270,NaN
+56.1078,562,coasting,NaN,2.0995,0.0216,NaN
+56.2078,563,coasting,NaN,2.1017,0.0173,NaN
+56.3078,564,coasting,NaN,2.1034,0.0138,NaN
+56.4078,565,coasting,NaN,2.1048,0.0111,NaN
+56.5078,566,coasting,NaN,2.1059,0.0089,NaN
+56.6078,567,coasting,NaN,2.1068,0.0071,NaN
+56.7078,568,coasting,NaN,2.1075,0.0057,NaN
+56.8078,569,coasting,NaN,2.1080,0.0045,NaN
+56.9078,570,coasting,NaN,2.1085,0.0036,NaN
+57.0078,571,no target,NaN,NaN,NaN,NaN
+57.1078,572,no target,NaN,NaN,NaN,NaN
+57.2078,573,no target,NaN,NaN,NaN,NaN
+57.3078,574,tracking,1.9550,1.9550,0.0000,8.77
+57.4078,575,tracking,1.9551,1.9550,0.0003,8.78
+57.5078,576,tracking,2.3742,2.1646,0.6290,8.40
+57.6078,577,coasting,NaN,2.2275,0.5032,NaN
+57.7078,578,coasting,NaN,2.2779,0.4025,NaN
+57.8078,579,coasting,NaN,2.3181,0.3220,NaN
+57.9078,580,coasting,NaN,2.3503,0.2576,NaN
+58.0078,581,coasting,NaN,2.3761,0.2061,NaN
+58.1078,582,coasting,NaN,2.3967,0.1649,NaN
+58.2078,583,coasting,NaN,2.4132,0.1319,NaN
+58.3078,584,coasting,NaN,2.4264,0.1055,NaN
+58.4078,585,coasting,NaN,2.4369,0.0844,NaN
+58.5078,586,coasting,NaN,2.4454,0.0675,NaN
+58.6078,587,tracking,0.8176,0.8176,0.0000,6.53
+58.7078,588,tracking,0.8173,0.8174,-0.0005,6.52
+58.8078,589,coasting,NaN,0.8174,-0.0004,NaN
+58.9078,590,coasting,NaN,0.8174,-0.0003,NaN
+59.0078,591,coasting,NaN,0.8173,-0.0002,NaN
+59.1078,592,coasting,NaN,0.8173,-0.0002,NaN
+59.2078,593,coasting,NaN,0.8173,-0.0002,NaN
+59.3078,594,coasting,NaN,0.8173,-0.0001,NaN
+59.4078,595,coasting,NaN,0.8173,-0.0001,NaN
+59.5078,596,coasting,NaN,0.8172,-0.0001,NaN
+59.6078,597,coasting,NaN,0.8172,-0.0001,NaN
+59.7078,598,coasting,NaN,0.8172,-0.0000,NaN
+59.8078,599,tracking,1.3862,1.1017,0.8533,7.32
+59.9078,600,tracking,0.8953,1.0412,0.4158,8.40
+60.0078,601,tracking,1.0372,1.0600,0.3475,16.61
+60.1078,602,tracking,1.0294,1.0621,0.2496,16.92
+60.2078,603,tracking,1.0225,1.0548,0.1527,16.92
+60.3078,604,tracking,0.8975,0.9838,-0.1061,9.94
+60.4078,605,tracking,0.7997,0.8864,-0.3663,6.55
+60.5078,606,coasting,NaN,0.8498,-0.2930,NaN
+60.6078,607,coasting,NaN,0.8205,-0.2344,NaN
+60.7078,608,coasting,NaN,0.7971,-0.1875,NaN
+60.8078,609,coasting,NaN,0.7783,-0.1500,NaN
+60.9078,610,coasting,NaN,0.7633,-0.1200,NaN
+61.0078,611,coasting,NaN,0.7513,-0.0960,NaN
+61.1078,612,coasting,NaN,0.7500,-0.0768,NaN
+61.2078,613,coasting,NaN,0.7500,-0.0615,NaN
+61.3078,614,coasting,NaN,0.7500,-0.0492,NaN
+61.4078,615,coasting,NaN,0.7500,-0.0393,NaN
+61.5078,616,tracking,0.8347,0.7904,0.0937,7.72
+61.6078,617,tracking,0.8225,0.8111,0.1277,7.56
+61.7078,618,tracking,0.8225,0.8232,0.1256,7.56
+61.8078,619,coasting,NaN,0.8357,0.1005,NaN
+61.9078,620,coasting,NaN,0.8458,0.0804,NaN
+62.0078,621,tracking,0.7867,0.8202,-0.0203,8.11
+62.1078,622,tracking,0.7975,0.8078,-0.0514,8.91
+62.2078,623,tracking,0.8003,0.8015,-0.0551,6.64
+62.3078,624,coasting,NaN,0.7960,-0.0441,NaN
+62.4079,625,coasting,NaN,0.7916,-0.0352,NaN
+62.5079,626,coasting,NaN,0.7880,-0.0282,NaN
+62.6079,627,coasting,NaN,0.7852,-0.0226,NaN
+62.7079,628,coasting,NaN,0.7830,-0.0180,NaN
+62.8079,629,coasting,NaN,0.7812,-0.0144,NaN
+62.9079,630,coasting,NaN,0.7797,-0.0116,NaN
+63.0079,631,coasting,NaN,0.7786,-0.0092,NaN
+63.1079,632,coasting,NaN,0.7776,-0.0074,NaN
+63.2079,633,coasting,NaN,0.7769,-0.0059,NaN
+63.3079,634,coasting,NaN,0.7763,-0.0047,NaN
+63.4079,635,coasting,NaN,0.7758,-0.0038,NaN
+63.5079,636,coasting,NaN,0.7755,-0.0030,NaN
+63.6079,637,coasting,NaN,0.7752,-0.0024,NaN
+63.7079,638,no target,NaN,NaN,NaN,NaN
+63.8079,639,no target,NaN,NaN,NaN,NaN
+63.9079,640,no target,NaN,NaN,NaN,NaN
+64.0079,641,no target,NaN,NaN,NaN,NaN
+64.1079,642,tracking,2.2831,2.2831,0.0000,8.06
+64.2079,643,tracking,2.2828,2.2829,-0.0004,8.05
+64.3079,644,tracking,2.2755,2.2792,-0.0116,7.70
+64.4079,645,coasting,NaN,2.2780,-0.0093,NaN
+64.5079,646,coasting,NaN,2.2771,-0.0074,NaN
+64.6079,647,coasting,NaN,2.2763,-0.0059,NaN
+64.7079,648,coasting,NaN,2.2758,-0.0047,NaN
+64.8079,649,tracking,2.0045,2.1399,-0.4110,6.44
+64.9079,650,tracking,2.0282,2.0635,-0.5168,8.09
+65.0079,651,tracking,2.0204,2.0161,-0.5039,8.59
+65.1079,652,coasting,NaN,1.9657,-0.4031,NaN
+65.2079,653,coasting,NaN,1.9254,-0.3225,NaN
+65.3079,654,coasting,NaN,1.8932,-0.2580,NaN
+65.4079,655,coasting,NaN,1.8674,-0.2064,NaN
+65.5079,656,coasting,NaN,1.8467,-0.1651,NaN
+65.6079,657,coasting,NaN,1.8302,-0.1321,NaN
+65.7079,658,coasting,NaN,1.8170,-0.1057,NaN
+65.8079,659,coasting,NaN,1.8064,-0.0845,NaN
+65.9079,660,coasting,NaN,1.7980,-0.0676,NaN
+66.0079,661,coasting,NaN,1.7912,-0.0541,NaN
+66.1079,662,coasting,NaN,1.7858,-0.0433,NaN
+66.2079,663,coasting,NaN,1.7815,-0.0346,NaN
+66.3079,664,coasting,NaN,1.7780,-0.0277,NaN
+66.4079,665,coasting,NaN,1.7752,-0.0222,NaN
+66.5079,666,no target,NaN,NaN,NaN,NaN
+66.6079,667,no target,NaN,NaN,NaN,NaN
+66.7079,668,no target,NaN,NaN,NaN,NaN
+66.8079,669,no target,NaN,NaN,NaN,NaN
+66.9079,670,no target,NaN,NaN,NaN,NaN
+67.0079,671,no target,NaN,NaN,NaN,NaN
+67.1079,672,no target,NaN,NaN,NaN,NaN
+67.2079,673,no target,NaN,NaN,NaN,NaN
+67.3079,674,no target,NaN,NaN,NaN,NaN
+67.4079,675,no target,NaN,NaN,NaN,NaN
+67.5079,676,no target,NaN,NaN,NaN,NaN
+67.6079,677,no target,NaN,NaN,NaN,NaN
+67.7079,678,no target,NaN,NaN,NaN,NaN
+67.8079,679,no target,NaN,NaN,NaN,NaN
+67.9079,680,no target,NaN,NaN,NaN,NaN
+68.0079,681,no target,NaN,NaN,NaN,NaN
+68.1079,682,no target,NaN,NaN,NaN,NaN
+68.2079,683,no target,NaN,NaN,NaN,NaN
+68.3079,684,no target,NaN,NaN,NaN,NaN
+68.4079,685,no target,NaN,NaN,NaN,NaN
+68.5079,686,no target,NaN,NaN,NaN,NaN
+68.6079,687,no target,NaN,NaN,NaN,NaN
+68.7079,688,no target,NaN,NaN,NaN,NaN
+68.8079,689,no target,NaN,NaN,NaN,NaN
+68.9079,690,tracking,2.1486,2.1486,0.0000,6.80
+69.0080,691,tracking,2.0926,2.1206,-0.0839,6.86
+69.1080,692,tracking,2.0926,2.1024,-0.1133,7.10
+69.2080,693,coasting,NaN,2.0911,-0.0906,NaN
+69.3080,694,coasting,NaN,2.0820,-0.0725,NaN
+69.4080,695,coasting,NaN,2.0748,-0.0580,NaN
+69.5080,696,coasting,NaN,2.0690,-0.0464,NaN
+69.6080,697,tracking,2.2926,2.1785,0.2960,8.10
+69.7080,698,tracking,2.2858,2.2470,0.4126,7.08
+69.8080,699,tracking,2.3004,2.2943,0.4310,6.14
+69.9080,700,coasting,NaN,2.3374,0.3448,NaN
+70.0080,701,coasting,NaN,2.3719,0.2758,NaN
+70.1080,702,coasting,NaN,2.3995,0.2207,NaN
+70.2080,703,coasting,NaN,2.4216,0.1765,NaN
+70.3080,704,coasting,NaN,2.4392,0.1412,NaN
+70.4080,705,coasting,NaN,2.4533,0.1130,NaN
+70.5580,706,coasting,NaN,2.4703,0.0904,NaN
+70.6580,707,coasting,NaN,2.4793,0.0723,NaN
+70.7580,708,coasting,NaN,2.4865,0.0578,NaN
+70.8580,709,coasting,NaN,2.4923,0.0463,NaN
+70.9580,710,coasting,NaN,2.4970,0.0370,NaN
+71.0580,711,coasting,NaN,2.5007,0.0296,NaN
+71.1580,712,coasting,NaN,2.5036,0.0237,NaN
+71.2580,713,coasting,NaN,2.5060,0.0190,NaN
+71.3580,714,no target,NaN,NaN,NaN,NaN
+71.4580,715,no target,NaN,NaN,NaN,NaN
+71.5580,716,no target,NaN,NaN,NaN,NaN
+71.6580,717,no target,NaN,NaN,NaN,NaN
+71.7580,718,no target,NaN,NaN,NaN,NaN
+71.8580,719,no target,NaN,NaN,NaN,NaN
+71.9580,720,no target,NaN,NaN,NaN,NaN
+72.0580,721,no target,NaN,NaN,NaN,NaN
+72.1580,722,no target,NaN,NaN,NaN,NaN
+72.2580,723,no target,NaN,NaN,NaN,NaN
+72.3580,724,no target,NaN,NaN,NaN,NaN
+72.4580,725,no target,NaN,NaN,NaN,NaN
+72.5580,726,no target,NaN,NaN,NaN,NaN
+72.6580,727,no target,NaN,NaN,NaN,NaN
+72.7580,728,no target,NaN,NaN,NaN,NaN
+72.8580,729,tracking,1.5900,1.5900,0.0000,8.51
+72.9580,730,tracking,1.5905,1.5902,0.0007,8.50
+73.0580,731,tracking,1.5886,1.5894,-0.0019,8.42
+73.1580,732,coasting,NaN,1.5892,-0.0015,NaN
+73.2580,733,coasting,NaN,1.5891,-0.0012,NaN
+73.3580,734,coasting,NaN,1.5890,-0.0010,NaN
+73.4580,735,coasting,NaN,1.5889,-0.0008,NaN
+73.5580,736,coasting,NaN,1.5888,-0.0006,NaN
+73.6580,737,coasting,NaN,1.5887,-0.0005,NaN
+73.7580,738,coasting,NaN,1.5887,-0.0004,NaN
+73.8580,739,coasting,NaN,1.5886,-0.0003,NaN
+73.9580,740,coasting,NaN,1.5886,-0.0003,NaN
+74.0580,741,coasting,NaN,1.5886,-0.0002,NaN
+74.1580,742,coasting,NaN,1.5886,-0.0002,NaN
+74.2580,743,coasting,NaN,1.5886,-0.0001,NaN
+74.3580,744,coasting,NaN,1.5885,-0.0001,NaN
+74.4580,745,coasting,NaN,1.5885,-0.0001,NaN
+74.5580,746,no target,NaN,NaN,NaN,NaN
+74.6580,747,no target,NaN,NaN,NaN,NaN
+74.7580,748,no target,NaN,NaN,NaN,NaN
+74.8580,749,no target,NaN,NaN,NaN,NaN
+74.9580,750,no target,NaN,NaN,NaN,NaN
+75.0580,751,no target,NaN,NaN,NaN,NaN
+75.1580,752,no target,NaN,NaN,NaN,NaN
+75.2580,753,no target,NaN,NaN,NaN,NaN
+75.3580,754,no target,NaN,NaN,NaN,NaN
+75.4581,755,no target,NaN,NaN,NaN,NaN
+75.5581,756,no target,NaN,NaN,NaN,NaN
+75.6581,757,tracking,2.3077,2.3077,0.0000,6.46
+75.7581,758,coasting,NaN,2.3077,0.0000,NaN
+75.8581,759,coasting,NaN,2.3077,0.0000,NaN
+75.9581,760,coasting,NaN,2.3077,0.0000,NaN
+76.0581,761,coasting,NaN,2.3077,0.0000,NaN
+76.1581,762,coasting,NaN,2.3077,0.0000,NaN
+76.2581,763,coasting,NaN,2.3077,0.0000,NaN
+76.3581,764,coasting,NaN,2.3077,0.0000,NaN
+76.4581,765,coasting,NaN,2.3077,0.0000,NaN
+76.5581,766,coasting,NaN,2.3077,0.0000,NaN
+76.6581,767,coasting,NaN,2.3077,0.0000,NaN
+76.7581,768,coasting,NaN,2.3077,0.0000,NaN
+76.8581,769,coasting,NaN,2.3077,0.0000,NaN
+76.9581,770,coasting,NaN,2.3077,0.0000,NaN
+77.0581,771,coasting,NaN,2.3077,0.0000,NaN
+77.1581,772,no target,NaN,NaN,NaN,NaN
+77.2581,773,no target,NaN,NaN,NaN,NaN
+77.3581,774,no target,NaN,NaN,NaN,NaN
+77.4581,775,no target,NaN,NaN,NaN,NaN
+77.5581,776,no target,NaN,NaN,NaN,NaN
+77.6581,777,no target,NaN,NaN,NaN,NaN
+77.7581,778,no target,NaN,NaN,NaN,NaN
+77.8581,779,no target,NaN,NaN,NaN,NaN
+77.9581,780,no target,NaN,NaN,NaN,NaN
+78.0581,781,no target,NaN,NaN,NaN,NaN
+78.1581,782,no target,NaN,NaN,NaN,NaN
+78.2581,783,no target,NaN,NaN,NaN,NaN
+78.3581,784,no target,NaN,NaN,NaN,NaN
+78.4581,785,no target,NaN,NaN,NaN,NaN
+78.5581,786,no target,NaN,NaN,NaN,NaN
+78.6581,787,no target,NaN,NaN,NaN,NaN
+78.7581,788,no target,NaN,NaN,NaN,NaN
+78.8581,789,no target,NaN,NaN,NaN,NaN
+78.9581,790,no target,NaN,NaN,NaN,NaN
+79.0581,791,no target,NaN,NaN,NaN,NaN
+79.1581,792,no target,NaN,NaN,NaN,NaN
+79.2581,793,no target,NaN,NaN,NaN,NaN
+79.3581,794,no target,NaN,NaN,NaN,NaN
+79.4581,795,no target,NaN,NaN,NaN,NaN
+79.5581,796,no target,NaN,NaN,NaN,NaN
+79.6581,797,no target,NaN,NaN,NaN,NaN
+79.7581,798,no target,NaN,NaN,NaN,NaN
+79.8581,799,no target,NaN,NaN,NaN,NaN
+79.9581,800,no target,NaN,NaN,NaN,NaN
+80.0581,801,no target,NaN,NaN,NaN,NaN
+80.1581,802,tracking,2.3684,2.3684,0.0000,6.25
+80.2581,803,coasting,NaN,2.3684,0.0000,NaN
+80.3581,804,coasting,NaN,2.3684,0.0000,NaN
+80.4581,805,coasting,NaN,2.3684,0.0000,NaN
+80.5581,806,coasting,NaN,2.3684,0.0000,NaN
+80.6581,807,coasting,NaN,2.3684,0.0000,NaN
+80.7581,808,coasting,NaN,2.3684,0.0000,NaN
+80.8581,809,coasting,NaN,2.3684,0.0000,NaN
+80.9581,810,coasting,NaN,2.3684,0.0000,NaN
+81.0581,811,coasting,NaN,2.3684,0.0000,NaN
+81.1581,812,coasting,NaN,2.3684,0.0000,NaN
+81.2581,813,coasting,NaN,2.3684,0.0000,NaN
+81.3581,814,coasting,NaN,2.3684,0.0000,NaN
+81.4581,815,coasting,NaN,2.3684,0.0000,NaN
+81.5581,816,coasting,NaN,2.3684,0.0000,NaN
+81.6581,817,no target,NaN,NaN,NaN,NaN
+81.7581,818,no target,NaN,NaN,NaN,NaN
+81.8581,819,no target,NaN,NaN,NaN,NaN
+81.9582,820,no target,NaN,NaN,NaN,NaN
+82.0582,821,no target,NaN,NaN,NaN,NaN

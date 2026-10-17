@@ -33,14 +33,18 @@ S.rxTime   = 0;
 
 % Learning (empty scene)
 S.learnY   = zeros(nG, 0);
+S.learnT   = zeros(1, 0);        % frame times of learnY
 S.learned  = false;
 S.B        = zeros(nG, 1);       % clutter map (static scene)
 S.thr      = inf(nG, 1);         % detection threshold per tap
+S.thrFactor = cfg.ThresholdFactor; % thr / empty-scene floor (the F quantile in 'variance')
 S.noise    = NaN;
 
 % MTI
 S.prevY    = [];
 S.eBuf     = zeros(nG, 0);       % last IntegrateFrames energies
+S.aBuf     = zeros(nG, 0);       % 'variance': last nWin magnitude profiles
+S.nWin     = NaN;                % 'variance': window length in frames
 
 % Track
 S.track    = struct('active', false, 'r', NaN, 'v', 0, 't', NaN, ...

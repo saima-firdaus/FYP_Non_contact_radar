@@ -16,6 +16,8 @@ function [S, R] = mti_step(S, frame)
 %      (y_n - y_n-1)
 %   4. integrate |MTI|^2 over a few frames, threshold it tap by tap against
 %      what the empty scene produced, pick the person's echo
+%      ('variance' replaces 3-4: variance of |CIR| over the last
+%      VarianceSeconds, thresholded against the empty room's variance)
 %   5. convert tap -> distance on the ellipse and smooth with an alpha-beta
 %      tracker
 %
@@ -27,7 +29,7 @@ function [S, R] = mti_step(S, frame)
 %   rTrack     tracked distance (m), NaN if no track
 %   vTrack     rate of change of distance (m/s), + = moving away
 %   snrDB      detection strength over threshold+noise, dB
-%   energy     integrated MTI energy on the grid
+%   energy     integrated MTI energy on the grid ('variance': the variance)
 %   threshold  per-tap threshold on the grid
 %   shift      sub-tap alignment applied (taps)
 %   learnProgress  0..1 while learning
@@ -105,14 +107,38 @@ R.y        = y;               % after: what the clutter map sees
 R.gain     = g;               % complex direct-path gain removed from this frame
 
 % ---- 3a. Learn the empty scene --------------------------------------------------
+% The variance detector compares magnitudes, the other modes complex y.
+isVar = strcmpi(cfg.MTIMode, 'variance');
+v = y;
+if isVar
+    if strcmpi(cfg.VarianceNormalise, 'direct'), v = abs(y); else, v = abs(xg); end
+    v(~isfinite(v)) = 0;
+end
 if ~S.learned
-    S.learnY(:, end+1) = y;
+    S.learnY(:, end+1) = v;
+    S.learnT(end+1) = t;
     R.status = 'learning';
     R.learnProgress = min((t - S.t0 - cfg.SettleSeconds) / cfg.LearnSeconds, 1);
     if t - S.t0 >= cfg.SettleSeconds + cfg.LearnSeconds && size(S.learnY, 2) >= 3
         S = local_finish_learning(S);
     end
     S.prevY = y;
+    return
+end
+
+% ---- 3b/4. Variance detector ('variance') ----------------------------------------------
+% Sample variance of each tap over the last nWin frames. The buffer starts
+% with the end of the learning window, so it is full from the first frame.
+if isVar
+    S.aBuf(:, end+1) = v;
+    if size(S.aBuf, 2) > S.nWin
+        S.aBuf = S.aBuf(:, end-S.nWin+1:end);
+    end
+    E = var(S.aBuf, 0, 2);
+    R.energy    = E;
+    R.threshold = S.thr;
+    cand = local_candidates(S, E);
+    [S, R] = local_track(S, R, cand, t);
     return
 end
 
@@ -287,20 +313,26 @@ end
 function S = local_finish_learning(S)
 cfg = S.cfg;
 Y = S.learnY;
-S.B = mean(Y, 2);
-
-% Residual energy the MTI filter lets through while nothing moves: that is
-% the floor a real target has to beat, tap by tap.
-if strcmpi(cfg.MTIMode, 'diff')
-    res = abs(diff(Y, 1, 2)).^2;
+if strcmpi(cfg.MTIMode, 'variance')
+    [V, S] = local_learn_variance(S, Y);
 else
-    res = abs(Y - S.B).^2;
-end
-V = mean(res, 2);
+    S.B = mean(Y, 2);
 
-% Averaging IntegrateFrames frames lowers the spread of the energy, not its
-% mean, so the mean residual is the right floor. Spread it +/- 1 tap so a
-% target sitting between two quiet taps next to a noisy one is not favoured.
+    % Residual energy the MTI filter lets through while nothing moves: that
+    % is the floor a real target has to beat, tap by tap. Averaging
+    % IntegrateFrames frames lowers the spread of the energy, not its mean,
+    % so the mean residual is the right floor.
+    if strcmpi(cfg.MTIMode, 'diff')
+        res = abs(diff(Y, 1, 2)).^2;
+    else
+        res = abs(Y - S.B).^2;
+    end
+    V = mean(res, 2);
+    S.thrFactor = cfg.ThresholdFactor;
+end
+
+% Spread the floor +/- 1 tap so a target sitting between two quiet taps
+% next to a noisy one is not favoured.
 w = max(1, round(1 / cfg.GridStep));
 Vd = V;
 for k = 1:w
@@ -311,10 +343,42 @@ S.noise = median(V(S.noiseIdx));
 if ~isfinite(S.noise) || S.noise <= 0
     S.noise = median(V(V > 0));
 end
-S.thr = cfg.ThresholdFactor * max(Vd, S.noise);
+S.thr = S.thrFactor * max(Vd, S.noise);
 S.learned = true;
 S.learnY  = [];
+S.learnT  = [];
 S.eBuf    = zeros(numel(S.grid), 0);
+end
+
+% =============================================================================
+function [V, S] = local_learn_variance(S, Y)
+% Empty-room floor for the variance detector (Y holds magnitudes). The live
+% statistic is a variance over nWin consecutive frames, so the floor is the
+% average variance over every nWin-frame stretch of the learning window:
+% drift across the whole window, which a short window never sees, does not
+% inflate it.
+cfg = S.cfg;
+nL = size(Y, 2);
+rate = (nL - 1) / max(S.learnT(end) - S.learnT(1), eps);
+W = min(max(3, round(cfg.VarianceSeconds * rate)), nL);
+V = zeros(size(Y, 1), 1);
+for s = 1:nL - W + 1
+    V = V + var(Y(:, s:s+W-1), 0, 2);
+end
+V = V / (nL - W + 1);
+% Under "nothing changed", variance now / V ~ F(W-1, dfBg); the
+% non-overlapping W-frame stretches give dfBg, a conservative count.
+S.thrFactor = local_finv(1 - cfg.VariancePfa, W - 1, floor(nL / W) * (W - 1));
+S.nWin = W;
+S.aBuf = Y(:, end-W+1:end);
+end
+
+% =============================================================================
+function x = local_finv(p, d1, d2)
+% F-distribution quantile without the Statistics Toolbox, as in
+% cir_phase_analysis_variance: if X ~ F(d1,d2), d1 X/(d1 X + d2) ~ Beta(d1/2, d2/2).
+b = betaincinv(p, d1 / 2, d2 / 2);
+x = (d2 * b) / (d1 * (1 - b));
 end
 
 % =============================================================================
@@ -390,7 +454,7 @@ end
 
 if ~isempty(pick)
     R.rDet  = pick.r;
-    R.snrDB = 10 * log10(pick.ratio * cfg.ThresholdFactor);
+    R.snrDB = 10 * log10(pick.ratio * S.thrFactor);
     if ~T.active || abs(pick.r - rPred) > cfg.GateMetres
         % New track, or re-acquired somewhere else
         T.active = true;

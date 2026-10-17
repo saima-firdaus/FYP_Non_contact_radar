@@ -48,6 +48,8 @@ function out = cir_mti_live(varargin)
 %   'PrintEvery'    0.5        seconds between Command Window lines
 % plus anything MTI_CONFIG takes: 'Separation', 'MaxRange', 'MTIMode',
 % 'ClutterAlpha', 'LearnSeconds', 'ThresholdFactor', 'Pick', ...
+% 'MTIMode', 'variance' swaps the complex subtraction for the variance
+% (BSDA) detector; cir_mti_live_variance is the shortcut for that.
 
 % The mti_*.m helpers must sit in the same folder as this file.
 addpath(fileparts(mfilename('fullpath')));
@@ -57,7 +59,7 @@ if exist('mti_config', 'file') ~= 2
 end
 
 % ---- Options ----------------------------------------------------------------------
-o = struct('Port', "COM4", 'Baud', 921600, 'StartupDelayS', 0, 'Replay', '', ...
+o = struct('Port', "COM8", 'Baud', 921600, 'StartupDelayS', 0, 'Replay', '', ...
            'ReplaySpeed', 1, 'DurationS', Inf, 'Record', true, ...
            'OutputRoot', pwd, 'Display', true, 'WindowS', 20, 'PrintEvery', 0.5);
 cfgArgs = {};
@@ -297,7 +299,11 @@ G.hPk  = plot(G.ax3, NaN, NaN, 'v', 'MarkerSize', 10, 'LineWidth', 1.5, ...
               'MarkerFaceColor', [0.85 0.33 0.1], 'MarkerEdgeColor', 'k');
 xlim(G.ax3, [0 rMax]); ylim(G.ax3, [-15 25]);
 xlabel(G.ax3, 'Distance from midpoint (m)');
-ylabel(G.ax3, 'MTI over threshold (dB)');
+if strcmpi(cfg.MTIMode, 'variance')
+    ylabel(G.ax3, 'Variance over threshold (dB)');
+else
+    ylabel(G.ax3, 'MTI over threshold (dB)');
+end
 title(G.ax3, 'Motion now, by distance (above dashed line = detected)');
 end
 
@@ -354,7 +360,7 @@ if ~isempty(R.energy)
     db(~isfinite(db)) = -15;
     set(G.hPro, 'XData', S.rangeAxis(ok), 'YData', db);
     if isfinite(R.rDet)
-        set(G.hPk, 'XData', R.rDet, 'YData', min(R.snrDB - 10*log10(cfg.ThresholdFactor), 25));
+        set(G.hPk, 'XData', R.rDet, 'YData', min(R.snrDB - 10*log10(S.thrFactor), 25));
     else
         set(G.hPk, 'XData', NaN, 'YData', NaN);
     end

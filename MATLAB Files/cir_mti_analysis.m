@@ -93,7 +93,12 @@ fprintf('\n=== MTI: %s ===\n', info.source);
 fprintf('Frames      : %d (%.1f s, %.1f Hz)\n', n, t(end), (n-1)/max(t(end),eps));
 fprintf('Geometry    : modules %.2f m apart, searching %.2f-%.2f m, direct-path peak +%.2f taps\n', ...
     cfg.Separation, cfg.MinRange, cfg.MaxRange, S.k0);
-fprintf('MTI         : %s, %s\n', cfg.MTIMode, local_tf(cfg.Coherent, 'coherent I/Q', 'magnitude only'));
+if strcmpi(cfg.MTIMode, 'variance')
+    fprintf('MTI         : variance of |CIR| over %d frames (%s), x%.2f threshold (Pfa %g)\n', ...
+        S.nWin, cfg.VarianceNormalise, S.thrFactor, cfg.VariancePfa);
+else
+    fprintf('MTI         : %s, %s\n', cfg.MTIMode, local_tf(cfg.Coherent, 'coherent I/Q', 'magnitude only'));
+end
 fprintf('Detections  : %d of %d frames after learning (%.0f%%)\n', ...
     sum(isfinite(rDet)), sum(live), 100*sum(isfinite(rDet))/max(sum(live),1));
 if any(isfinite(rTrk))

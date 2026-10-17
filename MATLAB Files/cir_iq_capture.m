@@ -28,10 +28,10 @@ function outDir = cir_iq_capture(varargin)
 %     lost line; about 6% of your last capture) are dropped before anything
 %     is written, so both methods, and cir_phase_analysis2, see the same
 %     clean frames.
-%   - At the end it runs cir_phase_analysis_iq on the folder: the magnitude
-%     method (cir_phase_analysis2's) and the complex I/Q method (the MTI
-%     chain's) side by side on the same frames, with where you stood marked
-%     when you give TrueDistance.
+%   - At the end it runs cir_phase_analysis_iq on the folder: BSDA
+%     (cir_phase_analysis_variance's SD change) and the complex I/Q method
+%     (the MTI chain's) side by side on the same frames, re-aligned by their
+%     shape, with where you stood marked when you give TrueDistance.
 %
 % Options (defaults are CIR_capture.m's constants):
 %   'Port'           'COM4'
@@ -42,7 +42,7 @@ function outDir = cir_iq_capture(varargin)
 %   'WalkPromptAtS'  10      background ends here
 %   'WalkDurationS'  10      break to walk to your mark
 %   'RunLabel'       'iq_static'
-%   'Separation'     1       tag-anchor distance in m (TAG_ANCHOR_DIST_M)
+%   'Separation'     0.5       tag-anchor distance in m (TAG_ANCHOR_DIST_M)
 %   'TrueDistance'   NaN     where you will stand, in m from the midpoint
 %                            of the modules (tape-measured), for the figure
 %   'OutputRoot'     pwd
@@ -61,8 +61,8 @@ if exist('mti_parse_line', 'file') ~= 2
            'files) next to this script.']);
 end
 
-o = struct('Port', 'COM4', 'Baud', 921600, 'CaptureSeconds', 30, ...
-           'StartupDelayS', 10, 'WalkPromptAtS', 10, 'WalkDurationS', 10, ...
+o = struct('Port', 'COM8', 'Baud', 921600, 'CaptureSeconds', 30, ...
+           'StartupDelayS', 5, 'WalkPromptAtS', 10, 'WalkDurationS', 10, ...
            'RunLabel', 'iq_static', 'Separation', 1, 'TrueDistance', NaN, ...
            'OutputRoot', pwd, 'TapsBeforeFP', 50, 'TapsAfterFP', 100, ...
            'GridStep', 0.5, 'TapToMetres', 0.30028, 'Analyse', true, ...
@@ -169,7 +169,7 @@ if o.Analyse && nBg > 0 && nP2 > 0
 end
 fprintf('Done. All output written to %s\n', outDir);
 fprintf('Re-run the comparison: cir_phase_analysis_iq(''%s'')\n', outDir);
-fprintf('Original magnitude figure: cir_phase_analysis2(''%s'')\n', outDir);
+fprintf('Original magnitude figure: cir_phase_analysisD(''%s'')\n', outDir);
 end
 
 % =============================================================================

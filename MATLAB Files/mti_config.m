@@ -24,7 +24,7 @@ function cfg = mti_config(varargin)
 
 cfg = struct();
 
-cfg.Separation     = 1.0;       % m, tag-anchor spacing (foci of the ellipse)
+cfg.Separation     = 0.75;       % m, tag-anchor spacing (foci of the ellipse)
 cfg.TapToMetres    = 0.30028;   % one accumulator tap = 1.0016 ns of path
 cfg.MinRange       = 0.75;      % m, nearest distance searched. Closer than
                                 % this the echo sits on the direct path's own
@@ -58,7 +58,9 @@ cfg.DirectWindow   = [-3 8];    % taps: where the direct path lives
 % measured from. [] = the maximum 0..8 taps after FP in the first frame. Set
 % it (typically 1.5-2.5) if that maximum is a floor/ceiling bounce sitting
 % on the pulse's tail rather than the direct pulse: each tap of error moves
-% every distance by about 0.15 m.
+% every distance by about 0.15 m. The new PCB shows the direct path at
+% several delays (~+1, +6, +10 taps); there, use the zero calibrated by
+% cir_static_distance (~10 taps on 2026-10-15) together with Pick 'strongest'.
 cfg.PeakOffsetTaps = [];
 
 % ---- Clutter removal (the MTI filter) --------------------------------------
@@ -69,6 +71,12 @@ cfg.PeakOffsetTaps = [];
 %  'diff'     y_n - y_(n-1), the classic two-pulse canceller. Only sees
 %             what changed since the last frame, so a person who pauses
 %             disappears at once. Good for arm motions.
+%  'variance' variance of each tap's MAGNITUDE over the last
+%             VarianceSeconds against the variance the empty room showed:
+%             the live form of BSDA (cir_phase_analysis_variance). Needs no
+%             phase reference and ignores slow drift of the static scene,
+%             so it is the steadier choice when the direct path is weak or
+%             the background wanders. Settings below.
 cfg.MTIMode        = 'clutter';
 cfg.ClutterAlpha   = 0.02;      % 0 = frozen background; 0.02 at ~10 Hz ~ 5 s memory
 cfg.ClutterFreeze  = 20;        % taps with motion on them update this many times slower
@@ -79,6 +87,21 @@ cfg.ClutterFreeze  = 20;        % taps with motion on them update this many time
 % floor to about +/-10% (vs +/-14% from 50), so fewer false alarms.
 cfg.LearnSeconds   = 10;        % learn the empty room for this long
 cfg.SettleSeconds  = 3;         % frames dropped first (AGC / oscillator settling)
+
+% ---- Variance detector (MTIMode 'variance') --------------------------------
+% Per tap, the sample variance of |CIR| over the last VarianceSeconds of
+% frames is compared with the empty room's variance over windows of the same
+% length. Under "nothing changed" their ratio is F-distributed, so the
+% threshold is the F quantile for VariancePfa (as cir_phase_analysis_variance).
+% A longer window is steadier but smears a walker over the range covered in
+% it: ~1 m per second at walking speed, which the tracker then averages.
+cfg.VarianceSeconds   = 1.5;
+cfg.VariancePfa       = 1e-3;   % per-tap false-alarm probability
+%  'rxpacc'   magnitude / RXPACC, as captured (cir_phase_analysis_variance's
+%             default). Robust when the direct path is weak.
+%  'direct'   also divided by the direct-path gain: removes AGC wander, but
+%             only helps when the direct path is the strongest, steady path.
+cfg.VarianceNormalise = 'rxpacc';
 
 % ---- Detection -----------------------------------------------------------
 % MTI energy |MTI|^2 is averaged over the last IntegrateFrames frames, then
@@ -95,6 +118,8 @@ cfg.NoiseWindow    = [-45 -8];  % taps before the first path: noise only
 %              LATER than the person's own echo (a path through a point is
 %              never shorter than TX -> point -> RX), so the earliest
 %              detection is the person, not an artefact behind them.
+%              Not on the new PCB: its earlier, weaker copies of every echo
+%              come first, so 'nearest' picks a copy.
 %  'strongest' the largest detection in range.
 cfg.Pick           = 'nearest';
 cfg.NearestWithinDB = 10;       % 'nearest' ignores echoes this far below the
@@ -136,8 +161,11 @@ for k = 1:2:numel(args)
     cfg.(known{hit}) = args{k+1};
 end
 
-if ~any(strcmpi(cfg.MTIMode, {'clutter','diff'}))
-    error('MTIMode must be ''clutter'' or ''diff''.');
+if ~any(strcmpi(cfg.MTIMode, {'clutter','diff','variance'}))
+    error('MTIMode must be ''clutter'', ''diff'' or ''variance''.');
+end
+if ~any(strcmpi(cfg.VarianceNormalise, {'rxpacc','direct'}))
+    error('VarianceNormalise must be ''rxpacc'' or ''direct''.');
 end
 if ~any(strcmpi(cfg.Pick, {'nearest','strongest'}))
     error('Pick must be ''nearest'' or ''strongest''.');
