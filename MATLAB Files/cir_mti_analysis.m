@@ -14,11 +14,26 @@ function out = cir_mti_analysis(src, varargin)
 %   2. how fast that distance is changing (+ = walking away)
 %   3. how long the person was detected at each distance (histogram)
 %
+% plus a second figure, mti_compare: the same capture through both
+% detectors, complex subtraction above variance, on the same axes, headed
+% with the separation L and the range searched.
+%
+% The capture's own settings are used: MTIMode, Separation, MaxRange,
+% LearnSeconds, SettleSeconds and ClutterAlpha come from its
+% session_info.csv (what cir_mti_live / cir_mti_live_variance ran with), so a
+% variance recording is analysed with the variance detector. Anything passed
+% here overrides them.
+%
 % Options: anything MTI_CONFIG takes (Separation, MaxRange, MTIMode,
 % ClutterAlpha, LearnSeconds, ThresholdFactor, ...) plus
 %   'Plot'          true
-%   'Save'          true    write mti_track.csv and mti_analysis.png/.fig
-%   'ShowRangeTime' false   add a distance-time intensity map (panel 4)
+%   'Save'          true    write mti_track.csv and the figures (.png/.fig)
+%                           (replaces the live run's mti_track.csv)
+%   'Compare'       true    also run the detector the capture was NOT
+%                           recorded with, for the mti_compare figure
+%   'ShowRangeTime' []      add a distance-time map of the detector's output
+%                           over its threshold (panel 4), with the track on
+%                           it; [] = on for variance captures, off otherwise
 %
 % The first LearnSeconds (after SettleSeconds) must be an empty scene: that
 % is where the static room and the detection threshold are learned. Frames
@@ -35,19 +50,36 @@ end
 if nargin < 1 || isempty(src)
     src = local_newest(pwd);
 end
-plotIt = true; saveIt = true; showRT = false;
+plotIt = true; saveIt = true; showRT = []; compareIt = true;
 cfgArgs = {};
 for k = 1:2:numel(varargin)
     switch lower(varargin{k})
         case 'plot',          plotIt = logical(varargin{k+1});
         case 'save',          saveIt = logical(varargin{k+1});
+        case 'compare',       compareIt = logical(varargin{k+1});
         case 'showrangetime', showRT = logical(varargin{k+1});
         otherwise,            cfgArgs(end+1:end+2) = varargin(k:k+1); %#ok<AGROW>
     end
 end
 
 [frames, info] = mti_read_capture(src);
-cfg = mti_config(cfgArgs{:});
+% The settings the capture was recorded with, unless given here
+sesMap = {'mti_mode', 'MTIMode'; 'separation_m', 'Separation'; 'max_range_m', 'MaxRange'; ...
+          'learn_seconds', 'LearnSeconds'; 'settle_seconds', 'SettleSeconds'; ...
+          'clutter_alpha', 'ClutterAlpha'};
+sesArgs = {}; sesUsed = {};
+for k = 1:size(sesMap, 1)
+    if ~isfield(info.session, sesMap{k, 1}) || any(strcmpi(cfgArgs(1:2:end), sesMap{k, 2}))
+        continue
+    end
+    v = info.session.(sesMap{k, 1});
+    if isnumeric(v) && ~(isscalar(v) && isfinite(v)), continue; end
+    if ~isnumeric(v), v = char(string(v)); end
+    sesArgs(end+1:end+2) = {sesMap{k, 2}, v}; %#ok<AGROW>
+    sesUsed{end+1} = sprintf('%s %s', sesMap{k, 2}, char(string(v))); %#ok<AGROW>
+end
+cfg = mti_config(sesArgs{:}, cfgArgs{:});
+if isempty(showRT), showRT = strcmpi(cfg.MTIMode, 'variance'); end
 if ~info.coherent
     cfg.Coherent = false;
     fprintf(['NOTE: %s has no I/Q (CIR_capture only saves amplitude), so ' ...
@@ -65,21 +97,10 @@ if isfield(info.session, 'walk_prompt_at_s') && isnumeric(info.session.walk_prom
 end
 
 % ---- Run -------------------------------------------------------------------
-S = mti_init(cfg);
-n = numel(frames);
-t = nan(n,1); fno = nan(n,1); rDet = nan(n,1); rTrk = nan(n,1);
-vTrk = nan(n,1); snr = nan(n,1); status = cell(n,1); lag = nan(n,1);
-Emap = [];
-for i = 1:n
-    [S, R] = mti_step(S, frames{i});
-    t(i) = R.t; fno(i) = R.frameNo; rDet(i) = R.rDet; rTrk(i) = R.rTrack;
-    vTrk(i) = R.vTrack; snr(i) = R.snrDB; status{i} = R.status; lag(i) = R.lag;
-    if ~isempty(R.energy)
-        if isempty(Emap), Emap = nan(numel(R.energy), n); end
-        Emap(:, i) = R.energy ./ R.threshold;
-    end
-end
-t = t - t(1);
+M = local_run(frames, cfg);
+S = M.S; n = numel(frames);
+t = M.t; fno = M.fno; rDet = M.rDet; rTrk = M.rTrk; vTrk = M.vTrk; snr = M.snr;
+status = M.status; lag = M.lag; Emap = M.Emap;
 
 out = struct('source', info.source, 'cfg', cfg, 't', t, 'frame', fno, ...
     'rDet', rDet, 'rTrack', rTrk, 'vTrack', vTrk, 'snrDB', snr, ...
@@ -91,6 +112,9 @@ out.mtiOverThreshold = Emap;       % taps x frames, 1 = detection level
 live = ~strcmp(status, 'settling') & ~strcmp(status, 'learning');
 fprintf('\n=== MTI: %s ===\n', info.source);
 fprintf('Frames      : %d (%.1f s, %.1f Hz)\n', n, t(end), (n-1)/max(t(end),eps));
+if ~isempty(sesUsed)
+    fprintf('Settings    : from session_info.csv - %s\n', strjoin(sesUsed, ', '));
+end
 fprintf('Geometry    : modules %.2f m apart, searching %.2f-%.2f m, direct-path peak +%.2f taps\n', ...
     cfg.Separation, cfg.MinRange, cfg.MaxRange, S.k0);
 if strcmpi(cfg.MTIMode, 'variance')
@@ -127,6 +151,32 @@ if ~isempty(truth)
     out.truth = [t tr];
 end
 
+% ---- The same capture through both detectors ----------------------------------------
+% The one it was recorded with is the run above; the other is run here with
+% every other setting the same.
+if compareIt
+    modes = {'clutter', 'variance'};
+    C = cell(1, 2);
+    for k = 1:2
+        if strcmpi(cfg.MTIMode, modes{k})
+            C{k} = M;
+        else
+            cfgK = cfg; cfgK.MTIMode = modes{k};
+            C{k} = local_run(frames, cfgK);
+        end
+    end
+    det = cellfun(@(c) 100 * sum(isfinite(c.rDet(c.live))) / max(sum(c.live), 1), C);
+    fprintf('Compare     : complex subtraction detects in %.0f%%, variance in %.0f%% of frames after learning', det);
+    both = isfinite(C{1}.rTrk) & isfinite(C{2}.rTrk);
+    if any(both)
+        fprintf('; where both track, they differ by a median %.2f m', ...
+            median(abs(C{1}.rTrk(both) - C{2}.rTrk(both))));
+    end
+    fprintf('\n');
+    out.compare = struct('mode', {modes}, 'rDet', {{C{1}.rDet, C{2}.rDet}}, ...
+        'rTrack', {{C{1}.rTrk, C{2}.rTrk}}, 'detectedPct', det);
+end
+
 % ---- Save -----------------------------------------------------------------------
 outDir = local_dir(src);
 if saveIt
@@ -146,25 +196,9 @@ if plotIt
     fig = figure('Color', 'w', 'Position', [80 60 1000 250*nP]);
     learnEnd = cfg.SettleSeconds + cfg.LearnSeconds;
 
-    ax1 = subplot(nP, 1, 1); hold(ax1, 'on');
-    yl = [0 cfg.MaxRange + 0.9];
-    patch(ax1, [0 learnEnd learnEnd 0], yl([1 1 2 2]), [0.92 0.92 0.92], ...
-        'EdgeColor', 'none');
-    h = plot(ax1, t, rDet, '.', 'Color', [0.55 0.55 0.55], 'MarkerSize', 9);
-    h(2) = plot(ax1, t, rTrk, '-', 'Color', [0 0.35 0.75], 'LineWidth', 2);
-    names = {'Detection (this frame)', 'Tracked distance'};
-    if isfield(out, 'truth')
-        h(3) = plot(ax1, t, out.truth(:,2), '--', 'Color', [0.85 0.33 0.1], ...
-            'LineWidth', 1.2);
-        names{3} = 'True distance';
-    end
-    text(ax1, learnEnd/2, cfg.MaxRange/2, {'learning', 'empty room'}, ...
-        'HorizontalAlignment', 'center', 'Color', [0.4 0.4 0.4]);
-    ylim(ax1, yl); xlim(ax1, [0 t(end)]); grid(ax1, 'on');
-    ylabel(ax1, 'Distance from midpoint (m)');
-    title(ax1, sprintf('Person distance vs time  -  %s', local_name(info.source)), ...
-        'Interpreter', 'none');
-    legend(ax1, h, names, 'Location', 'north', 'Orientation', 'horizontal');
+    name = local_name(info.source);
+    ax1 = subplot(nP, 1, 1);
+    local_distance_panel(ax1, out, cfg, learnEnd, sprintf('Person distance vs time  -  %s', name));
 
     ax2 = subplot(nP, 1, 2); hold(ax2, 'on');
     plot(ax2, t, vTrk, '-', 'Color', [0.2 0.55 0.2], 'LineWidth', 1.5);
@@ -195,21 +229,123 @@ if plotIt
         db(~isfinite(db)) = -10;
         db  = interp1(S.rangeAxis(okr), db, rr, 'linear', -10);
         imagesc(ax4, t, rr, db);
-        axis(ax4, 'xy'); caxis(ax4, [-10 20]); colorbar(ax4);
+        axis(ax4, 'xy'); caxis(ax4, [-10 20]); cb = colorbar(ax4);
+        ylabel(cb, 'dB over threshold');
+        hold(ax4, 'on');
+        plot(ax4, t, rTrk, 'r-', 'LineWidth', 1.5);
+        plot(ax4, t, rDet, 'w.', 'MarkerSize', 5);
+        xlim(ax4, [0 t(end)]); ylim(ax4, [cfg.MinRange cfg.MaxRange]);
         xlabel(ax4, 'Time (s)'); ylabel(ax4, 'Distance (m)');
-        title(ax4, 'MTI over threshold (dB) by distance and time');
+        if strcmpi(cfg.MTIMode, 'variance')
+            title(ax4, sprintf(['Variance of |CIR| over %d frames vs the empty room (dB over ' ...
+                'threshold); red = track, white = detections'], S.nWin));
+        else
+            title(ax4, 'MTI over threshold (dB) by distance and time; red = track, white = detections');
+        end
     end
     xlabel(ax2, 'Time (s)');
     out.fig = fig;
 
-    if saveIt
-        print(fig, fullfile(outDir, 'mti_analysis.png'), '-dpng', '-r150');
-        if exist('savefig', 'file') || exist('savefig', 'builtin')
-            try, savefig(fig, fullfile(outDir, 'mti_analysis.fig')); catch, end %#ok<NOCOM>
+    st = aps006_style();
+    figs = {fig, 'mti_analysis'};
+
+    % The same capture through both detectors, on the same axes
+    if compareIt
+        figC = figure('Color', st.figureColour, 'Position', [120 40 1200 820]);
+        tl = tiledlayout(figC, 2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+        title(tl, sprintf('Separation, d = %g m  |  Range = [%g, %g] m', cfg.Separation, cfg.MinRange, ...
+            cfg.MaxRange), 'FontSize', st.labelFontSize + 1, 'FontWeight', 'bold');
+        lbl = {'Complex subtraction (clutter map)', ...
+               sprintf('Variance (BSDA), %d-frame window', C{2}.S.nWin)};
+        axC = gobjects(1, 2);
+        for k = 1:2
+            D = struct('t', C{k}.t, 'rDet', C{k}.rDet, 'rTrack', C{k}.rTrk);
+            if isfield(out, 'truth'), D.truth = out.truth; end
+            axC(k) = nexttile(tl);
+            local_distance_panel(axC(k), D, cfg, learnEnd, sprintf('%s: detected in %.0f%% of frames%s', ...
+                lbl{k}, det(k), local_tf(strcmpi(cfg.MTIMode, modes{k}), '  (as recorded)', '')));
         end
-        fprintf('Saved mti_analysis.png\n');
+        xlabel(axC(2), 'Time (s)', 'FontSize', st.labelFontSize);
+        linkaxes(axC, 'xy');
+        out.compareFig = figC;
+        figs(end+1, :) = {figC, 'mti_compare'};
+    end
+
+    if saveIt
+        for k = 1:size(figs, 1)
+            print(figs{k, 1}, fullfile(outDir, [figs{k, 2} '.png']), '-dpng', '-r150');
+            if exist('savefig', 'file') || exist('savefig', 'builtin')
+                try, savefig(figs{k, 1}, fullfile(outDir, [figs{k, 2} '.fig'])); catch, end %#ok<NOCOM>
+            end
+        end
+        fprintf('Saved %s (.png/.fig)\n', strjoin(figs(:, 2).', ', '));
     end
 end
+end
+
+% =============================================================================
+function M = local_run(frames, cfg)
+% Every frame through mti_step, exactly as cir_mti_live runs it.
+S = mti_init(cfg);
+n = numel(frames);
+M = struct('t', nan(n,1), 'fno', nan(n,1), 'rDet', nan(n,1), 'rTrk', nan(n,1), ...
+           'vTrk', nan(n,1), 'snr', nan(n,1), 'status', {cell(n,1)}, 'lag', nan(n,1), ...
+           'Emap', []);
+for i = 1:n
+    [S, R] = mti_step(S, frames{i});
+    M.t(i) = R.t; M.fno(i) = R.frameNo; M.rDet(i) = R.rDet; M.rTrk(i) = R.rTrack;
+    M.vTrk(i) = R.vTrack; M.snr(i) = R.snrDB; M.status{i} = R.status; M.lag(i) = R.lag;
+    if ~isempty(R.energy)
+        if isempty(M.Emap), M.Emap = nan(numel(R.energy), n); end
+        M.Emap(:, i) = R.energy ./ R.threshold;
+    end
+end
+M.t = M.t - M.t(1);
+M.S = S;
+M.live = ~strcmp(M.status, 'settling') & ~strcmp(M.status, 'learning');
+end
+
+% =============================================================================
+function local_distance_panel(ax, D, cfg, learnEnd, ttl)
+% Distance vs time in the APS006 look of the CIR plots (aps006_style): blue
+% trace with asterisks, dashed grid, boxed axes. 0 to MaxRange, so runs with
+% the same range gate share one scale. D has t, rDet, rTrack (and truth).
+st = aps006_style();
+hold(ax, 'on');
+t = D.t;
+yl = [0 cfg.MaxRange];
+patch(ax, [0 learnEnd learnEnd 0], yl([1 1 2 2]), st.excludeColour, 'EdgeColor', 'none', ...
+    'FaceAlpha', st.excludeAlpha, 'HandleVisibility', 'off');
+text(ax, learnEnd/2, cfg.MaxRange/2, {'learning', 'empty room'}, ...
+    'HorizontalAlignment', 'center', 'Color', [0.4 0.4 0.4], 'FontSize', st.fontSize);
+h = plot(ax, t, D.rDet, '.', 'Color', [0.55 0.55 0.55], 'MarkerSize', 8);
+step = max(1, round(0.5 / median(diff(t), 'omitnan')));      % an asterisk every ~0.5 s
+h(2) = plot(ax, t, D.rTrack, '-', 'Color', st.cirColour, 'LineWidth', 1.2, ...
+    'Marker', st.cirMarker, 'MarkerSize', st.cirMarkerSize, 'MarkerIndices', 1:step:numel(t));
+names = {'Detection (this frame)', 'Tracked distance'};
+if isfield(D, 'truth')
+    h(3) = plot(ax, t, D.truth(:,2), '--', 'Color', st.fpColour, 'LineWidth', st.fpWidth);
+    names{3} = 'True distance';
+end
+local_style_axes(ax, st);
+ylim(ax, yl); xlim(ax, [0 t(end)]);
+ylabel(ax, 'Distance from midpoint (m)', 'FontSize', st.labelFontSize);
+title(ax, ttl, 'FontSize', st.labelFontSize, 'FontWeight', 'normal', 'Interpreter', 'none');
+legend(ax, h, names, 'Location', 'northwest', 'FontSize', st.legendSize, 'Box', 'on', ...
+    'EdgeColor', [0 0 0]);
+end
+
+function local_style_axes(ax, st)
+% The axes styling cir_phase_analysis_variance / cir_phase_analysisD use.
+grid(ax, 'on');
+ax.GridLineStyle = st.gridStyle;
+ax.GridColor     = st.gridColour;
+ax.GridAlpha     = st.gridAlpha;
+ax.Layer         = 'bottom';
+ax.FontSize      = st.fontSize;
+ax.LineWidth     = st.axesWidth;
+ax.TickDir       = 'in';
+box(ax, 'on');
 end
 
 % =============================================================================

@@ -24,12 +24,12 @@ function cfg = mti_config(varargin)
 
 cfg = struct();
 
-cfg.Separation     = 0.75;       % m, tag-anchor spacing (foci of the ellipse)
+cfg.Separation     = 0.5;       % m, tag-anchor spacing (foci of the ellipse)
 cfg.TapToMetres    = 0.30028;   % one accumulator tap = 1.0016 ns of path
 cfg.MinRange       = 0.75;      % m, nearest distance searched. Closer than
                                 % this the echo sits on the direct path's own
                                 % pulse and cannot be separated from it.
-cfg.MaxRange       = 3.50;      % m, furthest distance searched (walk <= 3.2 m)
+cfg.MaxRange       = 4.50;      % m, furthest distance searched (walk <= 3.2 m)
 
 % ---- Delay grid ----------------------------------------------------------
 % Every frame is resampled onto this grid of taps relative to FP_INDEX
